@@ -61,13 +61,6 @@ export function Sidebar() {
           <span className="nav-dot"></span>
           {t.settings}
         </Link>
-        <Link
-          href="/configuration"
-          className={`nav-item ${pathname === "/configuration" ? "active" : ""}`}
-        >
-          <span className="nav-dot"></span>
-          {t.scriptEditor}
-        </Link>
       </div>
 
       <div className="sidebar-footer">

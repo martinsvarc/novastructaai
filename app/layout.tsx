@@ -4,6 +4,9 @@ import { ClientLayout } from "./client-layout";
 
 export const metadata: Metadata = {
   title: "Nova Structa AI",
+  icons: {
+    icon: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({
