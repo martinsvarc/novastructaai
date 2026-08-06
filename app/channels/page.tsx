@@ -17,6 +17,11 @@ interface Channel {
   connected_pct: number;
 }
 
+interface TelnyxNumber {
+  phone_number: string;
+  monthly_cost: string;
+}
+
 const CHANNEL_COLORS = [
   "#4A90D9",
   "#EA4335",
@@ -31,7 +36,7 @@ const CHANNEL_COLORS = [
 function formatPhone(phone: string) {
   const digits = phone.replace(/\D/g, "");
   if (digits.length === 11 && digits.startsWith("1")) {
-    return `(${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+    return `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
   }
   if (digits.length === 10) {
     return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
@@ -42,10 +47,24 @@ function formatPhone(phone: string) {
 export default function ChannelsPage() {
   const [channels, setChannels] = useState<Channel[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showAdd, setShowAdd] = useState(false);
-  const [newName, setNewName] = useState("");
-  const [newPhone, setNewPhone] = useState("");
-  const [saving, setSaving] = useState(false);
+
+  // Add Number flow
+  const [showSearch, setShowSearch] = useState(false);
+  const [areaCode, setAreaCode] = useState("");
+  const [searchResults, setSearchResults] = useState<TelnyxNumber[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [buying, setBuying] = useState(false);
+  const [confirmNumber, setConfirmNumber] = useState<TelnyxNumber | null>(null);
+  const [searchError, setSearchError] = useState("");
+  const [buyError, setBuyError] = useState("");
+
+  // Remove flow
+  const [confirmRemoveId, setConfirmRemoveId] = useState<number | null>(null);
+  const [removing, setRemoving] = useState(false);
+
+  // Inline name editing
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingName, setEditingName] = useState("");
 
   const fetchChannels = useCallback(async () => {
     try {
@@ -65,42 +84,100 @@ export default function ChannelsPage() {
     fetchChannels();
   }, [fetchChannels]);
 
-  const addChannel = async () => {
-    if (!newName.trim() || !newPhone.trim()) return;
-    setSaving(true);
+  // --- Search available numbers ---
+  const searchNumbers = async () => {
+    if (areaCode.length !== 3) return;
+    setSearching(true);
+    setSearchError("");
+    setSearchResults([]);
+    setConfirmNumber(null);
+    setBuyError("");
     try {
-      const color = CHANNEL_COLORS[channels.length % CHANNEL_COLORS.length];
-      const res = await fetch("/api/channels", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newName.trim(), phone: newPhone.trim(), color }),
-      });
+      const res = await fetch(`/api/telnyx/numbers/search?areaCode=${areaCode}`);
       if (res.ok) {
-        setNewName("");
-        setNewPhone("");
-        setShowAdd(false);
-        fetchChannels();
+        const data = await res.json();
+        setSearchResults(data);
+        if (!data.length) setSearchError("No numbers found for that area code.");
+      } else {
+        setSearchError("Search failed. Try a different area code.");
       }
-    } catch (e) {
-      console.error("Failed to add channel:", e);
+    } catch {
+      setSearchError("Search failed. Check your connection.");
     } finally {
-      setSaving(false);
+      setSearching(false);
     }
   };
 
-  const removeChannel = async (id: number) => {
+  // --- Buy a number ---
+  const buyNumber = async () => {
+    if (!confirmNumber) return;
+    setBuying(true);
+    setBuyError("");
     try {
-      await fetch("/api/channels", {
-        method: "DELETE",
+      const res = await fetch("/api/telnyx/numbers/buy", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
+        body: JSON.stringify({ phoneNumber: confirmNumber.phone_number }),
       });
+      if (res.ok) {
+        resetSearch();
+        fetchChannels();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        setBuyError(err.error || "Purchase failed. Please try again.");
+        setConfirmNumber(null);
+      }
+    } catch {
+      setBuyError("Purchase failed. Check your connection.");
+      setConfirmNumber(null);
+    } finally {
+      setBuying(false);
+    }
+  };
+
+  const resetSearch = () => {
+    setShowSearch(false);
+    setAreaCode("");
+    setSearchResults([]);
+    setSearching(false);
+    setBuying(false);
+    setConfirmNumber(null);
+    setSearchError("");
+    setBuyError("");
+  };
+
+  // --- Remove a channel ---
+  const removeChannel = async (id: number) => {
+    setRemoving(true);
+    try {
+      await fetch(`/api/telnyx/numbers/${id}`, { method: "DELETE" });
+      setConfirmRemoveId(null);
       fetchChannels();
     } catch (e) {
       console.error("Failed to remove channel:", e);
+    } finally {
+      setRemoving(false);
     }
   };
 
+  // --- Inline name editing ---
+  const startEdit = (ch: Channel) => {
+    setEditingId(ch.id);
+    setEditingName(ch.name);
+  };
+
+  const saveEdit = () => {
+    if (editingId === null) return;
+    setChannels((prev) =>
+      prev.map((ch) =>
+        ch.id === editingId ? { ...ch, name: editingName.trim() || ch.name } : ch
+      )
+    );
+    setEditingId(null);
+    setEditingName("");
+  };
+
+  // --- Derived stats ---
   const totals = channels.reduce(
     (acc, ch) => ({
       calls: acc.calls + ch.total_calls,
@@ -115,8 +192,8 @@ export default function ChannelsPage() {
   if (loading) {
     return (
       <div className="page-container">
-        <div className="page-tag">Channel Tracking</div>
-        <h2 className="page-title">Performance by Source</h2>
+        <div className="page-tag">Number Management</div>
+        <h2 className="page-title">Channels</h2>
         <p style={{ color: "var(--text-muted)" }}>Loading...</p>
       </div>
     );
@@ -124,8 +201,8 @@ export default function ChannelsPage() {
 
   return (
     <div className="page-container">
-      <div className="page-tag">Channel Tracking</div>
-      <h2 className="page-title">Performance by Source</h2>
+      <div className="page-tag">Number Management</div>
+      <h2 className="page-title">Channels</h2>
 
       {/* Stats bar */}
       <div className="stats-bar">
@@ -165,26 +242,56 @@ export default function ChannelsPage() {
 
         {channels.map((ch) => (
           <div key={ch.id} className="channels-row">
+            {/* Name cell — editable */}
             <div className="channel-name-cell">
-              <div
-                className="channel-dot"
-                style={{ background: ch.color }}
-              />
-              {ch.name}
+              <div className="channel-dot" style={{ background: ch.color }} />
+              {editingId === ch.id ? (
+                <input
+                  type="text"
+                  value={editingName}
+                  onChange={(e) => setEditingName(e.target.value)}
+                  onBlur={saveEdit}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") saveEdit();
+                    if (e.key === "Escape") setEditingId(null);
+                  }}
+                  className="channel-input"
+                  autoFocus
+                  style={{ maxWidth: 140 }}
+                />
+              ) : (
+                <span
+                  style={{ cursor: "text" }}
+                  title="Click to rename"
+                  onClick={() => startEdit(ch)}
+                >
+                  {ch.name}
+                </span>
+              )}
             </div>
+
             <div className="channel-phone">{formatPhone(ch.phone)}</div>
             <div className="channel-cell">{ch.total_calls}</div>
-            <div className="channel-cell" style={{ color: "var(--green, #4caf76)", fontWeight: 500 }}>
+            <div
+              className="channel-cell"
+              style={{ color: "var(--green, #4caf76)", fontWeight: 500 }}
+            >
               {ch.transferred}
             </div>
-            <div className="channel-cell" style={{ color: "var(--text-secondary)" }}>
+            <div
+              className="channel-cell"
+              style={{ color: "var(--text-secondary)" }}
+            >
               {ch.callbacks}
             </div>
             <div className="channel-cell">
               <div className="conv-bar">
                 <span
                   style={{
-                    color: ch.connected_pct >= 50 ? "var(--green, #4caf76)" : "var(--text-primary)",
+                    color:
+                      ch.connected_pct >= 50
+                        ? "var(--green, #4caf76)"
+                        : "var(--text-primary)",
                     fontWeight: ch.connected_pct >= 50 ? 600 : 400,
                   }}
                 >
@@ -195,79 +302,182 @@ export default function ChannelsPage() {
                     className="conv-fill"
                     style={{
                       width: `${ch.connected_pct}%`,
-                      background: ch.connected_pct >= 50 ? "var(--green, #4caf76)" : "var(--whiskey)",
+                      background:
+                        ch.connected_pct >= 50
+                          ? "var(--green, #4caf76)"
+                          : "var(--whiskey)",
                     }}
                   />
                 </div>
               </div>
             </div>
+
+            {/* Remove / confirm remove */}
             <div className="channel-cell">
-              <button
-                onClick={() => removeChannel(ch.id)}
-                className="channel-remove"
-                title="Remove channel"
-              >
-                ×
-              </button>
+              {confirmRemoveId === ch.id ? (
+                <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--text-muted)", whiteSpace: "nowrap" }}>
+                  Release?&nbsp;
+                  <button
+                    onClick={() => removeChannel(ch.id)}
+                    disabled={removing}
+                    className="channel-save-btn"
+                    style={{ fontSize: 11, padding: "2px 8px" }}
+                  >
+                    {removing ? "…" : "Release"}
+                  </button>
+                  <button
+                    onClick={() => setConfirmRemoveId(null)}
+                    className="channel-cancel-btn"
+                    style={{ fontSize: 11, padding: "2px 8px" }}
+                  >
+                    Cancel
+                  </button>
+                </span>
+              ) : (
+                <button
+                  onClick={() => setConfirmRemoveId(ch.id)}
+                  className="channel-remove"
+                  title="Release number"
+                >
+                  ×
+                </button>
+              )}
             </div>
           </div>
         ))}
 
-        {/* Add channel row */}
-        {showAdd ? (
-          <div className="channels-row channels-add-row">
-            <div className="channel-name-cell">
-              <div
-                className="channel-dot"
-                style={{ background: CHANNEL_COLORS[channels.length % CHANNEL_COLORS.length] }}
-              />
+        {/* + Add Number row */}
+        {showSearch ? (
+          <div style={{ padding: "14px 20px", borderTop: "1px solid var(--border, rgba(255,255,255,0.06))" }}>
+            {/* Area code search */}
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: searchResults.length || searchError ? 12 : 0 }}>
               <input
                 type="text"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                placeholder="Channel name"
+                value={areaCode}
+                onChange={(e) => {
+                  const v = e.target.value.replace(/\D/g, "").slice(0, 3);
+                  setAreaCode(v);
+                  setSearchError("");
+                  setBuyError("");
+                }}
+                onKeyDown={(e) => e.key === "Enter" && searchNumbers()}
+                placeholder="Area code (e.g. 212)"
                 className="channel-input"
                 autoFocus
+                maxLength={3}
+                style={{ width: 140 }}
               />
-            </div>
-            <div>
-              <input
-                type="text"
-                value={newPhone}
-                onChange={(e) => setNewPhone(e.target.value)}
-                placeholder="+1234567890"
-                className="channel-input"
-                onKeyDown={(e) => e.key === "Enter" && addChannel()}
-              />
-            </div>
-            <div className="channel-cell" style={{ gridColumn: "span 4", display: "flex", gap: "8px" }}>
-              <button onClick={addChannel} className="channel-save-btn" disabled={saving}>
-                {saving ? "Saving..." : "Save"}
-              </button>
               <button
-                onClick={() => {
-                  setShowAdd(false);
-                  setNewName("");
-                  setNewPhone("");
-                }}
-                className="channel-cancel-btn"
+                onClick={searchNumbers}
+                disabled={searching || areaCode.length !== 3}
+                className="channel-save-btn"
               >
+                {searching ? "Searching…" : "Search"}
+              </button>
+              <button onClick={resetSearch} className="channel-cancel-btn">
                 Cancel
               </button>
             </div>
-            <div />
+
+            {searchError && (
+              <p style={{ fontSize: 12, color: "#e55", margin: "8px 0 0" }}>{searchError}</p>
+            )}
+
+            {buyError && (
+              <p style={{ fontSize: 12, color: "#e55", margin: "8px 0 0" }}>{buyError}</p>
+            )}
+
+            {/* Results list */}
+            {searchResults.length > 0 && !confirmNumber && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 4 }}>
+                {searchResults.map((num) => (
+                  <div
+                    key={num.phone_number}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "8px 12px",
+                      background: "var(--ash, rgba(255,255,255,0.04))",
+                      borderRadius: 6,
+                      fontSize: 13,
+                    }}
+                  >
+                    <span style={{ fontFamily: "var(--mono, monospace)", letterSpacing: "0.03em" }}>
+                      {formatPhone(num.phone_number)}
+                    </span>
+                    <span style={{ display: "flex", alignItems: "center", gap: 12, color: "var(--text-muted)" }}>
+                      <span style={{ fontSize: 12 }}>{num.monthly_cost}/mo</span>
+                      <button
+                        onClick={() => { setConfirmNumber(num); setBuyError(""); }}
+                        className="channel-save-btn"
+                        style={{ fontSize: 12, padding: "3px 10px" }}
+                      >
+                        Buy
+                      </button>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Confirm buy */}
+            {confirmNumber && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  padding: "10px 14px",
+                  background: "var(--ash, rgba(255,255,255,0.04))",
+                  borderRadius: 6,
+                  fontSize: 13,
+                  marginTop: 4,
+                }}
+              >
+                <span style={{ color: "var(--text-muted)" }}>
+                  Buy{" "}
+                  <strong style={{ color: "var(--text-primary)", fontFamily: "var(--mono, monospace)" }}>
+                    {formatPhone(confirmNumber.phone_number)}
+                  </strong>{" "}
+                  for {confirmNumber.monthly_cost}/mo?
+                </span>
+                <button
+                  onClick={buyNumber}
+                  disabled={buying}
+                  className="channel-save-btn"
+                  style={{ fontSize: 12, padding: "3px 12px" }}
+                >
+                  {buying ? "Buying…" : "Confirm"}
+                </button>
+                <button
+                  onClick={() => setConfirmNumber(null)}
+                  className="channel-cancel-btn"
+                  style={{ fontSize: 12, padding: "3px 10px" }}
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           <div
             className="channels-row channels-add-trigger"
-            onClick={() => setShowAdd(true)}
+            onClick={() => setShowSearch(true)}
+            style={{ cursor: "pointer" }}
           >
-            <div className="channel-name-cell" style={{ color: "var(--text-muted)", cursor: "pointer" }}>
+            <div
+              className="channel-name-cell"
+              style={{ color: "var(--text-muted)" }}
+            >
               <div
                 className="channel-dot"
-                style={{ background: "var(--ash)", border: "1px dashed var(--text-muted)" }}
+                style={{
+                  background: "transparent",
+                  border: "1px dashed var(--text-muted)",
+                }}
               />
-              + Add channel
+              + Add Number
             </div>
           </div>
         )}
@@ -280,9 +490,10 @@ export default function ChannelsPage() {
           <div className="chart-bars">
             {channels.map((ch) => {
               const height = Math.max((ch.total_calls / maxCalls) * 120, 4);
-              const transferredH = ch.total_calls > 0
-                ? (ch.transferred / ch.total_calls) * height
-                : 0;
+              const transferredH =
+                ch.total_calls > 0
+                  ? (ch.transferred / ch.total_calls) * height
+                  : 0;
               const otherH = height - transferredH;
               return (
                 <div key={ch.id} className="chart-bar-group">
@@ -291,13 +502,20 @@ export default function ChannelsPage() {
                     {otherH > 0 && (
                       <div
                         className="chart-bar-segment"
-                        style={{ height: `${otherH}px`, background: ch.color, opacity: 0.35 }}
+                        style={{
+                          height: `${otherH}px`,
+                          background: ch.color,
+                          opacity: 0.35,
+                        }}
                       />
                     )}
                     {transferredH > 0 && (
                       <div
                         className="chart-bar-segment"
-                        style={{ height: `${transferredH}px`, background: ch.color }}
+                        style={{
+                          height: `${transferredH}px`,
+                          background: ch.color,
+                        }}
                       />
                     )}
                   </div>
@@ -308,34 +526,54 @@ export default function ChannelsPage() {
           </div>
           <div className="chart-legend">
             <div className="legend-item">
-              <div className="legend-dot" style={{ background: "var(--whiskey)" }} />
+              <div
+                className="legend-dot"
+                style={{ background: "var(--whiskey)" }}
+              />
               Transferred
             </div>
             <div className="legend-item">
-              <div className="legend-dot" style={{ background: "var(--whiskey)", opacity: 0.35 }} />
+              <div
+                className="legend-dot"
+                style={{ background: "var(--whiskey)", opacity: 0.35 }}
+              />
               Other calls
             </div>
           </div>
         </div>
       )}
 
-      {/* Insight */}
-      {channels.length > 1 && (() => {
-        const best = [...channels].sort((a, b) => b.connected_pct - a.connected_pct)[0];
-        if (!best || best.total_calls === 0) return null;
-        return (
-          <div className="channels-insight">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6FC08A" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M22 11.08V12a10 10 0 11-5.93-9.14" />
-              <polyline points="22 4 12 14.01 9 11.01" />
-            </svg>
-            <span>
-              <strong style={{ color: best.color, fontWeight: 500 }}>{best.name}</strong>{" "}
-              connects at {best.connected_pct}% — highest quality channel.
-            </span>
-          </div>
-        );
-      })()}
+      {/* Insight card */}
+      {channels.length > 1 &&
+        (() => {
+          const best = [...channels].sort(
+            (a, b) => b.connected_pct - a.connected_pct
+          )[0];
+          if (!best || best.total_calls === 0) return null;
+          return (
+            <div className="channels-insight">
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#6FC08A"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M22 11.08V12a10 10 0 11-5.93-9.14" />
+                <polyline points="22 4 12 14.01 9 11.01" />
+              </svg>
+              <span>
+                <strong style={{ color: best.color, fontWeight: 500 }}>
+                  {best.name}
+                </strong>{" "}
+                connects at {best.connected_pct}% — highest quality channel.
+              </span>
+            </div>
+          );
+        })()}
     </div>
   );
 }

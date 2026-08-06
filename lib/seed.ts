@@ -51,6 +51,7 @@ async function seed() {
       inactivity_2_seconds INTEGER DEFAULT 10,
       inactivity_2_message TEXT DEFAULT 'I''m having a little trouble hearing you... are you there?',
       vad_sensitivity REAL DEFAULT 0.15,
+      telnyx_app_id TEXT DEFAULT '',
       updated_at TIMESTAMPTZ DEFAULT NOW()
     )
   `;
@@ -72,6 +73,22 @@ async function seed() {
   await sql`ALTER TABLE settings ADD COLUMN IF NOT EXISTS inactivity_2_seconds INTEGER DEFAULT 10`;
   await sql`ALTER TABLE settings ADD COLUMN IF NOT EXISTS inactivity_2_message TEXT DEFAULT $$I'm having a little trouble hearing you... are you there?$$`;
   await sql`ALTER TABLE settings ADD COLUMN IF NOT EXISTS vad_sensitivity REAL DEFAULT 0.15`;
+  await sql`ALTER TABLE settings ADD COLUMN IF NOT EXISTS telnyx_app_id TEXT DEFAULT ''`;
+
+  // Create channels table if it doesn't exist
+  await sql`
+    CREATE TABLE IF NOT EXISTS channels (
+      id SERIAL PRIMARY KEY,
+      name TEXT,
+      phone TEXT,
+      color TEXT DEFAULT '#f3880e',
+      telnyx_id TEXT DEFAULT '',
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `;
+
+  // Add telnyx_id to channels if it doesn't exist (migration for existing deployments)
+  await sql`ALTER TABLE channels ADD COLUMN IF NOT EXISTS telnyx_id TEXT DEFAULT ''`;
 
   // Seed calls
   // Base: July 8, 2026 at 3:00 PM ET (19:00 UTC)

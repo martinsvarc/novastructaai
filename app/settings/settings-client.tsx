@@ -820,24 +820,6 @@ export function SettingsClient({
       >
         <div className="card">
           <div className="card-header">
-            <div className="card-title">Telnyx</div>
-          </div>
-          <div className="cred-grid">
-            <div className="cred-field">
-              <label>Phone Number</label>
-              <input
-                className="cred-input"
-                type="text"
-                value={telnyxPhone}
-                onChange={(e) => setTelnyxPhone(e.target.value)}
-                placeholder="+1..."
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="card">
-          <div className="card-header">
             <div className="card-title">Ultravox</div>
           </div>
           <div className="cred-grid">
