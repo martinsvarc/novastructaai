@@ -42,6 +42,9 @@ export default function ChannelDetailPage() {
   const [channel, setChannel] = useState<Channel | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Toggle: use default or custom script
+  const [useCustom, setUseCustom] = useState(false);
+
   // Editable fields
   const [name, setName] = useState("");
   const [opener, setOpener] = useState("");
@@ -65,6 +68,8 @@ export default function ChannelDetailPage() {
           setSystemPrompt(ch.system_prompt || "");
           setScenarioA(ch.scenario_a_script || "");
           setScenarioB(ch.scenario_b_script || "");
+          // If any script field has content, it's custom
+          setUseCustom(!!(ch.system_prompt || ch.opener || ch.scenario_a_script || ch.scenario_b_script));
         }
       })
       .catch(() => {})
@@ -80,10 +85,10 @@ export default function ChannelDetailPage() {
         body: JSON.stringify({
           id: Number(id),
           name,
-          opener,
-          system_prompt: systemPrompt,
-          scenario_a_script: scenarioA,
-          scenario_b_script: scenarioB,
+          opener: useCustom ? opener : "",
+          system_prompt: useCustom ? systemPrompt : "",
+          scenario_a_script: useCustom ? scenarioA : "",
+          scenario_b_script: useCustom ? scenarioB : "",
         }),
       });
       if (res.ok) showToast("Saved — live on next call");
@@ -92,7 +97,7 @@ export default function ChannelDetailPage() {
     } finally {
       setSaving(false);
     }
-  }, [id, name, opener, systemPrompt, scenarioA, scenarioB]);
+  }, [id, name, opener, systemPrompt, scenarioA, scenarioB, useCustom]);
 
   // Auto-save on changes (1s debounce)
   useEffect(() => {
@@ -182,90 +187,117 @@ export default function ChannelDetailPage() {
         </div>
       </div>
 
-      {/* Opener */}
+      {/* Script mode toggle */}
       <div className="card">
-        <div className="card-header">
-          <div className="card-title">Opener</div>
-        </div>
-        <p style={{ fontSize: "0.78rem", color: "var(--text-secondary)", fontWeight: 300, marginBottom: 12, lineHeight: 1.6 }}>
-          The first thing the AI says when it picks up a call on this number. Leave empty to use the default from Settings.
-        </p>
-        <input
-          type="text"
-          className="cred-input"
-          value={opener}
-          onChange={(e) => setOpener(e.target.value)}
-          placeholder="Hi, thanks for calling Nova Structa..."
-          style={{ width: "100%", fontSize: "0.95rem" }}
-        />
-      </div>
-
-      {/* Main Script */}
-      <div className="card">
-        <div className="card-header">
-          <div className="card-title">Main Script</div>
-        </div>
-        <p style={{ fontSize: "0.78rem", color: "var(--text-secondary)", fontWeight: 300, marginBottom: 12, lineHeight: 1.6 }}>
-          The core instructions the AI follows on every call to this number — qualification, objections, tone. Leave empty to use the default.
-        </p>
-        <textarea
-          className="prompt-textarea"
-          value={systemPrompt}
-          onChange={(e) => setSystemPrompt(e.target.value)}
-          placeholder="Custom system prompt for this channel..."
-        />
-        <div className="textarea-footer">
-          <span className="char-count">{systemPrompt.length.toLocaleString()} characters</span>
-          <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>
-            {saving ? "Saving..." : "Auto-saves"}
-          </span>
+        <div className="toggle-row">
+          <div className="toggle-label">
+            <strong>Custom Script</strong>
+            <span>{useCustom ? "This channel uses its own script" : "Using the default script from Settings"}</span>
+          </div>
+          <label className="toggle-switch">
+            <input
+              type="checkbox"
+              checked={useCustom}
+              onChange={(e) => setUseCustom(e.target.checked)}
+            />
+            <span className="toggle-track"></span>
+          </label>
         </div>
       </div>
 
-      {/* Scenario A */}
-      <div className="card">
-        <div className="card-header">
-          <div className="card-title">Scenario A — Advisors Busy</div>
-        </div>
-        <p style={{ fontSize: "0.78rem", color: "var(--text-secondary)", fontWeight: 300, marginBottom: 12, lineHeight: 1.6 }}>
-          What the AI says when all advisors are busy during business hours. Leave empty for the default.
-        </p>
-        <textarea
-          className="prompt-textarea"
-          value={scenarioA}
-          onChange={(e) => setScenarioA(e.target.value)}
-          placeholder="Custom Scenario A script..."
-          style={{ minHeight: 120 }}
-        />
-        <div className="textarea-footer">
-          <span className="char-count">{scenarioA.length.toLocaleString()} characters</span>
-        </div>
-      </div>
+      {/* Script fields — only shown when custom is on */}
+      {useCustom ? (
+        <>
+          {/* Opener */}
+          <div className="card">
+            <div className="card-header">
+              <div className="card-title">Opener</div>
+            </div>
+            <p style={{ fontSize: "0.78rem", color: "var(--text-secondary)", fontWeight: 300, marginBottom: 12, lineHeight: 1.6 }}>
+              The first thing the AI says when it picks up a call on this number.
+            </p>
+            <input
+              type="text"
+              className="cred-input"
+              value={opener}
+              onChange={(e) => setOpener(e.target.value)}
+              placeholder="Hi, thanks for calling..."
+              style={{ width: "100%", fontSize: "0.95rem" }}
+            />
+          </div>
 
-      {/* Scenario B */}
-      <div className="card">
-        <div className="card-header">
-          <div className="card-title">Scenario B — After Hours</div>
-        </div>
-        <p style={{ fontSize: "0.78rem", color: "var(--text-secondary)", fontWeight: 300, marginBottom: 12, lineHeight: 1.6 }}>
-          What the AI says when a qualified lead calls outside business hours. Leave empty for the default.
-        </p>
-        <textarea
-          className="prompt-textarea"
-          value={scenarioB}
-          onChange={(e) => setScenarioB(e.target.value)}
-          placeholder="Custom Scenario B script..."
-          style={{ minHeight: 120 }}
-        />
-        <div className="textarea-footer">
-          <span className="char-count">{scenarioB.length.toLocaleString()} characters</span>
-        </div>
-      </div>
+          {/* Main Script */}
+          <div className="card">
+            <div className="card-header">
+              <div className="card-title">Main Script</div>
+            </div>
+            <p style={{ fontSize: "0.78rem", color: "var(--text-secondary)", fontWeight: 300, marginBottom: 12, lineHeight: 1.6 }}>
+              The core instructions the AI follows on every call to this number.
+            </p>
+            <textarea
+              className="prompt-textarea"
+              value={systemPrompt}
+              onChange={(e) => setSystemPrompt(e.target.value)}
+              placeholder="Custom system prompt for this channel..."
+            />
+            <div className="textarea-footer">
+              <span className="char-count">{systemPrompt.length.toLocaleString()} characters</span>
+              <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>
+                {saving ? "Saving..." : "Auto-saves"}
+              </span>
+            </div>
+          </div>
 
-      {/* Hint */}
-      <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: 8, fontWeight: 300 }}>
-        Empty fields automatically use the default script from Settings.
-      </p>
+          {/* Scenario A */}
+          <div className="card">
+            <div className="card-header">
+              <div className="card-title">Scenario A — Advisors Busy</div>
+            </div>
+            <p style={{ fontSize: "0.78rem", color: "var(--text-secondary)", fontWeight: 300, marginBottom: 12, lineHeight: 1.6 }}>
+              What the AI says when all advisors are busy during business hours.
+            </p>
+            <textarea
+              className="prompt-textarea"
+              value={scenarioA}
+              onChange={(e) => setScenarioA(e.target.value)}
+              placeholder="Custom Scenario A script..."
+              style={{ minHeight: 120 }}
+            />
+            <div className="textarea-footer">
+              <span className="char-count">{scenarioA.length.toLocaleString()} characters</span>
+            </div>
+          </div>
+
+          {/* Scenario B */}
+          <div className="card">
+            <div className="card-header">
+              <div className="card-title">Scenario B — After Hours</div>
+            </div>
+            <p style={{ fontSize: "0.78rem", color: "var(--text-secondary)", fontWeight: 300, marginBottom: 12, lineHeight: 1.6 }}>
+              What the AI says when a qualified lead calls outside business hours.
+            </p>
+            <textarea
+              className="prompt-textarea"
+              value={scenarioB}
+              onChange={(e) => setScenarioB(e.target.value)}
+              placeholder="Custom Scenario B script..."
+              style={{ minHeight: 120 }}
+            />
+            <div className="textarea-footer">
+              <span className="char-count">{scenarioB.length.toLocaleString()} characters</span>
+            </div>
+          </div>
+        </>
+      ) : (
+        <div style={{ textAlign: "center", padding: "40px 20px", color: "var(--text-muted)" }}>
+          <p style={{ fontFamily: "var(--serif)", fontSize: "1rem", fontWeight: 400, lineHeight: 1.5 }}>
+            This channel uses the default script from Settings.
+          </p>
+          <p style={{ fontSize: "0.78rem", marginTop: 8, fontWeight: 300 }}>
+            Toggle &ldquo;Custom Script&rdquo; to write a unique script for this number.
+          </p>
+        </div>
+      )}
     </div>
   );
 }
