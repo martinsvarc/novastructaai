@@ -22,9 +22,13 @@ async function seed() {
       duration_seconds INTEGER,
       recording_url TEXT,
       short_summary TEXT,
+      channel_phone TEXT DEFAULT '',
       created_at TIMESTAMPTZ DEFAULT NOW()
     )
   `;
+
+  // Add channel_phone if it doesn't exist (migration for existing deployments)
+  await sql`ALTER TABLE calls ADD COLUMN IF NOT EXISTS channel_phone TEXT DEFAULT ''`;
 
   await sql`
     CREATE TABLE IF NOT EXISTS settings (

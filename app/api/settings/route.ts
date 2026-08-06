@@ -7,6 +7,7 @@ function maskCred(val: string): string {
 }
 
 export async function GET() {
+  try {
   const sql = getDb();
   const rows = await sql`SELECT * FROM settings WHERE id = 1`;
   if (rows.length === 0) {
@@ -46,6 +47,10 @@ export async function GET() {
       sunday: { enabled: false, open: "", close: "" },
     },
   });
+  } catch (error) {
+    console.error("Settings GET error:", error);
+    return NextResponse.json({ error: "Failed to load settings" }, { status: 500 });
+  }
 }
 
 export async function PATCH(req: NextRequest) {
