@@ -61,19 +61,7 @@ export async function POST(req: NextRequest) {
     const closer = sortedClosers[0];
     console.log("warmTransfer: transferring to", closer.name, closer.phone);
 
-    // Speak the connecting message first
-    const connectMsg = transfer_connecting_msg || "Connecting you now.";
-    await fetch(`https://api.telnyx.com/v2/calls/${callControlId}/actions/speak`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${telnyxApiKey}` },
-      body: JSON.stringify({
-        payload: connectMsg,
-        language: "en-US",
-        voice: "female",
-      }),
-    });
-
-    // Transfer the call to the closer via Telnyx Call Control
+    // Transfer the call — the AI already tells the caller it's connecting them
     const transferRes = await fetch(`https://api.telnyx.com/v2/calls/${callControlId}/actions/transfer`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${telnyxApiKey}` },

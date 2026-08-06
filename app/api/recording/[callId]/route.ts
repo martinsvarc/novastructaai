@@ -13,7 +13,7 @@ export async function GET(
 
   const sql = getDb();
   const settings = await sql`SELECT ultravox_api_key FROM settings WHERE id = 1`;
-  const apiKey = settings[0]?.ultravox_api_key;
+  const apiKey = process.env.ULTRAVOX_API_KEY || settings[0]?.ultravox_api_key;
 
   if (!apiKey) {
     return NextResponse.json({ error: "No API key" }, { status: 500 });

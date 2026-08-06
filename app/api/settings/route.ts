@@ -57,67 +57,7 @@ export async function PATCH(req: NextRequest) {
   const body = await req.json();
   const sql = getDb();
 
-  // Build dynamic update — only update fields that are sent
-  const updates: string[] = [];
-  const values: unknown[] = [];
-  let idx = 0;
-
-  const fields: Record<string, string> = {
-    system_prompt: "system_prompt",
-    opener: "opener",
-    opener_speaks_first: "opener_speaks_first",
-    transfer_enabled: "transfer_enabled",
-    closers: "closers",
-    telnyx_phone: "telnyx_phone",
-    ultravox_api_key: "ultravox_api_key",
-    ultravox_agent_id: "ultravox_agent_id",
-    ultravox_voice_id: "ultravox_voice_id",
-    ghl_calendar_id: "ghl_calendar_id",
-    business_hours: "business_hours",
-    scenario_a_script: "scenario_a_script",
-    scenario_b_script: "scenario_b_script",
-    transfer_connecting_msg: "transfer_connecting_msg",
-    transfer_retry_msg: "transfer_retry_msg",
-    scenario_a_opener: "scenario_a_opener",
-    transfer_error_msg: "transfer_error_msg",
-    inactivity_1_seconds: "inactivity_1_seconds",
-    inactivity_1_message: "inactivity_1_message",
-    inactivity_2_seconds: "inactivity_2_seconds",
-    inactivity_2_message: "inactivity_2_message",
-    vad_sensitivity: "vad_sensitivity",
-  };
-
-  for (const [key, col] of Object.entries(fields)) {
-    if (key in body) {
-      const val = body[key];
-      // Skip masked credential values
-      if (typeof val === "string" && val.startsWith("****")) continue;
-
-      if (key === "closers" || key === "business_hours") {
-        updates.push(`${col} = $${++idx}::jsonb`);
-        values.push(JSON.stringify(val));
-      } else if (key === "transfer_enabled") {
-        updates.push(`${col} = $${++idx}`);
-        values.push(Boolean(val));
-      } else {
-        updates.push(`${col} = $${++idx}`);
-        values.push(val);
-      }
-    }
-  }
-
-  if (updates.length === 0) {
-    return NextResponse.json({ ok: true });
-  }
-
-  updates.push(`updated_at = NOW()`);
-
-  // Use raw query since we need dynamic updates
-  const query = `UPDATE settings SET ${updates.join(", ")} WHERE id = 1`;
-
-  // neon() tagged template doesn't support dynamic queries easily,
-  // so we'll do individual field updates
-  // Actually, let's just update all provided fields at once using the neon sql
+  // Full-row update using tagged template
   const current = await sql`SELECT * FROM settings WHERE id = 1`;
   if (current.length === 0) {
     return NextResponse.json({ error: "No settings found" }, { status: 404 });

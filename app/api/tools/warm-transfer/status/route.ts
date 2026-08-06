@@ -85,7 +85,7 @@ Use "..." to breathe between thoughts. Two sentences max per turn. One thing at 
           systemPrompt: scenarioAPrompt,
           model: "fixie-ai/ultravox-v0.7",
           voice: s.ultravox_voice_id || undefined,
-          medium: { telnyx: {} },
+          medium: { serverWebSocket: {} },
           firstSpeakerSettings: { user: {} },
           inactivityMessages: [
             {

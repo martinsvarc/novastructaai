@@ -124,12 +124,19 @@ export async function POST(req: NextRequest) {
     const webhook = await req.json();
     const eventType = webhook?.data?.event_type;
 
-    // Only handle call.initiated events
+    // Only handle inbound call.initiated events
     if (eventType !== "call.initiated") {
       return NextResponse.json({ ok: true });
     }
 
     const payload = webhook.data.payload;
+
+    // CRITICAL: Ignore outbound calls to prevent infinite loops from warm-transfer
+    if (payload.direction !== "incoming") {
+      console.log("Ignoring non-incoming call:", payload.direction);
+      return NextResponse.json({ ok: true });
+    }
+
     const callerPhone = payload.from || "";
     const callControlId = payload.call_control_id || "";
     const channelPhone = payload.to || "";
@@ -384,7 +391,8 @@ ENDING CALLS: Never hang up abruptly. Always ask "Is there anything else before 
         systemPrompt,
         model: "fixie-ai/ultravox-v0.7",
         voice: settings.ultravox_voice_id || undefined,
-        medium: { telnyx: {} },
+        medium: { serverWebSocket: {} },
+        webhookUrl: `${APP_URL}/api/webhooks/ultravox`,
         firstSpeakerSettings: (channel?.opener_speaks_first !== undefined ? channel.opener_speaks_first !== false : settings.opener_speaks_first !== false)
           ? { agent: { text: channel?.opener || settings.opener || "hey there" } }
           : { user: {} },

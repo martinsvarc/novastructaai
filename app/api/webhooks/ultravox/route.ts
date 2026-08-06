@@ -181,7 +181,7 @@ export async function POST(req: NextRequest) {
 
     const sql = getDb();
     const settingsRows = await sql`SELECT ultravox_api_key FROM settings WHERE id = 1`;
-    const apiKey = settingsRows[0]?.ultravox_api_key || "";
+    const apiKey = process.env.ULTRAVOX_API_KEY || settingsRows[0]?.ultravox_api_key || "";
 
     // Fetch recording URL — store the proxy path, not the direct Ultravox URL
     let recordingUrl = "";
@@ -244,17 +244,18 @@ export async function POST(req: NextRequest) {
       createdAt: new Date().toISOString(),
     };
 
-    try {
-      const n8nEndCallUrl = process.env.N8N_END_CALL_URL || "";
-      if (!n8nEndCallUrl) { console.warn("N8N_END_CALL_URL not set, skipping webhook"); }
-      const n8nRes = await fetch(n8nEndCallUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(n8nPayload),
-      });
-      console.log("N8N end-of-call webhook response:", n8nRes.status);
-    } catch (err) {
-      console.error("N8N end-of-call webhook error:", err);
+    const n8nEndCallUrl = process.env.N8N_END_CALL_URL || "";
+    if (n8nEndCallUrl) {
+      try {
+        const n8nRes = await fetch(n8nEndCallUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(n8nPayload),
+        });
+        console.log("N8N end-of-call webhook response:", n8nRes.status);
+      } catch (err) {
+        console.error("N8N end-of-call webhook error:", err);
+      }
     }
 
     return NextResponse.json({ ok: true });
