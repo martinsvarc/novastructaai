@@ -38,11 +38,15 @@ export async function GET(req: NextRequest) {
     }
 
     const data = await response.json();
-    const numbers = (data.data || []).map((n: Record<string, unknown>) => ({
-      phoneNumber: n.phone_number,
-      monthlyCost: (n.cost_information as Record<string, unknown>)?.monthly_cost || "1.00",
-      features: n.features || [],
-    }));
+    const numbers = (data.data || []).map((n: Record<string, unknown>) => {
+      const costInfo = n.cost_information as Record<string, unknown> | undefined;
+      const rawCost = String(costInfo?.monthly_cost || "1.00");
+      const formattedCost = "$" + parseFloat(rawCost).toFixed(2);
+      return {
+        phone_number: n.phone_number as string,
+        monthly_cost: formattedCost,
+      };
+    });
 
     return NextResponse.json(numbers);
   } catch (error) {

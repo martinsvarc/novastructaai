@@ -33,7 +33,8 @@ const CHANNEL_COLORS = [
   "#4ECDC4",
 ];
 
-function formatPhone(phone: string) {
+function formatPhone(phone: string | undefined | null) {
+  if (!phone) return "";
   const digits = phone.replace(/\D/g, "");
   if (digits.length === 11 && digits.startsWith("1")) {
     return `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
@@ -191,39 +192,43 @@ export default function ChannelsPage() {
 
   if (loading) {
     return (
-      <div className="page-container">
-        <div className="page-tag">Number Management</div>
-        <h2 className="page-title">Channels</h2>
+      <div>
+        <div className="page-header">
+          <div className="page-tag">Number Management</div>
+          <h2>Channels</h2>
+        </div>
         <p style={{ color: "var(--text-muted)" }}>Loading...</p>
       </div>
     );
   }
 
   return (
-    <div className="page-container">
-      <div className="page-tag">Number Management</div>
-      <h2 className="page-title">Channels</h2>
+    <div>
+      <div className="page-header">
+        <div className="page-tag">Number Management</div>
+        <h2>Channels</h2>
+      </div>
 
       {/* Stats bar */}
       <div className="stats-bar">
         <div className="stat-item">
-          <div className="stat-number">{totals.calls}</div>
+          <div className="stat-value">{totals.calls}</div>
           <div className="stat-label">Total Calls · 30 Days</div>
         </div>
         <div className="stat-item">
-          <div className="stat-number" style={{ color: "var(--whiskey)" }}>
+          <div className="stat-value" style={{ color: "var(--whiskey)" }}>
             {totals.transferred}
           </div>
           <div className="stat-label">Transferred</div>
         </div>
         <div className="stat-item">
-          <div className="stat-number" style={{ color: "var(--green, #4caf76)" }}>
+          <div className="stat-value" style={{ color: "var(--green, #4caf76)" }}>
             {totals.callbacks}
           </div>
           <div className="stat-label">Callbacks</div>
         </div>
         <div className="stat-item">
-          <div className="stat-number">{channels.length}</div>
+          <div className="stat-value">{channels.length}</div>
           <div className="stat-label">Active Channels</div>
         </div>
       </div>
