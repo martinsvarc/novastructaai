@@ -21,9 +21,7 @@ interface Settings {
   opener_speaks_first: boolean;
   transfer_enabled: boolean;
   closers: Closer[];
-  twilio_sid: string;
-  twilio_auth_token: string;
-  twilio_phone: string;
+  telnyx_phone: string;
   ultravox_api_key: string;
   ultravox_agent_id: string;
   ultravox_voice_id: string;
@@ -163,12 +161,8 @@ export function SettingsClient({
   const [saving, setSaving] = useState(false);
 
   // Credentials
-  const [twilioSid, setTwilioSid] = useState(initialSettings.twilio_sid);
-  const [twilioAuth, setTwilioAuth] = useState(
-    initialSettings.twilio_auth_token
-  );
-  const [twilioPhone, setTwilioPhone] = useState(
-    initialSettings.twilio_phone
+  const [telnyxPhone, setTelnyxPhone] = useState(
+    initialSettings.telnyx_phone
   );
   const [ultravoxKey, setUltravoxKey] = useState(
     initialSettings.ultravox_api_key
@@ -227,14 +221,12 @@ export function SettingsClient({
         inactivity_2_seconds: inactivity2Seconds,
         inactivity_2_message: inactivity2Message,
         vad_sensitivity: vadSensitivity,
-        twilio_phone: twilioPhone,
+        telnyx_phone: telnyxPhone,
         ultravox_agent_id: ultravoxAgentId,
         ultravox_voice_id: ultravoxVoiceId,
         ghl_calendar_id: ghlCalendarId,
       };
 
-      if (!twilioSid.startsWith("****")) body.twilio_sid = twilioSid;
-      if (!twilioAuth.startsWith("****")) body.twilio_auth_token = twilioAuth;
       if (!ultravoxKey.startsWith("****")) body.ultravox_api_key = ultravoxKey;
 
       const res = await fetch("/api/settings", {
@@ -254,8 +246,8 @@ export function SettingsClient({
     prompt, opener, openerSpeaksFirst, transferEnabled, closers, businessHours,
     scenarioAScript, scenarioBScript, transferConnectingMsg, transferRetryMsg,
     scenarioAOpener, transferErrorMsg, inactivity1Seconds, inactivity1Message,
-    inactivity2Seconds, inactivity2Message, vadSensitivity, twilioPhone, ultravoxAgentId,
-    ultravoxVoiceId, ghlCalendarId, twilioSid, twilioAuth, ultravoxKey,
+    inactivity2Seconds, inactivity2Message, vadSensitivity, telnyxPhone, ultravoxAgentId,
+    ultravoxVoiceId, ghlCalendarId, ultravoxKey,
   ]);
 
   useEffect(() => {
@@ -828,44 +820,16 @@ export function SettingsClient({
       >
         <div className="card">
           <div className="card-header">
-            <div className="card-title">Twilio</div>
+            <div className="card-title">Telnyx</div>
           </div>
           <div className="cred-grid">
-            <div className="cred-field">
-              <label>Account SID</label>
-              <input
-                className="cred-input"
-                type="text"
-                value={twilioSid}
-                onChange={(e) => setTwilioSid(e.target.value)}
-                onFocus={(e) => {
-                  if (e.target.value.startsWith("****")) e.target.value = "";
-                  setTwilioSid("");
-                }}
-                placeholder="AC..."
-              />
-            </div>
-            <div className="cred-field">
-              <label>Auth Token</label>
-              <input
-                className="cred-input"
-                type="text"
-                value={twilioAuth}
-                onChange={(e) => setTwilioAuth(e.target.value)}
-                onFocus={(e) => {
-                  if (e.target.value.startsWith("****")) e.target.value = "";
-                  setTwilioAuth("");
-                }}
-                placeholder="Auth token"
-              />
-            </div>
             <div className="cred-field">
               <label>Phone Number</label>
               <input
                 className="cred-input"
                 type="text"
-                value={twilioPhone}
-                onChange={(e) => setTwilioPhone(e.target.value)}
+                value={telnyxPhone}
+                onChange={(e) => setTelnyxPhone(e.target.value)}
                 placeholder="+1..."
               />
             </div>

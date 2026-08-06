@@ -20,9 +20,7 @@ export async function GET() {
     opener_speaks_first: s.opener_speaks_first !== false,
     transfer_enabled: s.transfer_enabled,
     closers: s.closers,
-    twilio_sid: maskCred(s.twilio_sid),
-    twilio_auth_token: maskCred(s.twilio_auth_token),
-    twilio_phone: s.twilio_phone,
+    telnyx_phone: s.telnyx_phone || "",
     ultravox_api_key: maskCred(s.ultravox_api_key),
     ultravox_agent_id: s.ultravox_agent_id,
     ultravox_voice_id: s.ultravox_voice_id,
@@ -65,9 +63,7 @@ export async function PATCH(req: NextRequest) {
     opener_speaks_first: "opener_speaks_first",
     transfer_enabled: "transfer_enabled",
     closers: "closers",
-    twilio_sid: "twilio_sid",
-    twilio_auth_token: "twilio_auth_token",
-    twilio_phone: "twilio_phone",
+    telnyx_phone: "telnyx_phone",
     ultravox_api_key: "ultravox_api_key",
     ultravox_agent_id: "ultravox_agent_id",
     ultravox_voice_id: "ultravox_voice_id",
@@ -138,17 +134,8 @@ export async function PATCH(req: NextRequest) {
       : row.transfer_enabled;
   const newClosers =
     "closers" in body ? JSON.stringify(body.closers) : JSON.stringify(row.closers);
-  const newTwilioSid =
-    "twilio_sid" in body && !String(body.twilio_sid).startsWith("****")
-      ? body.twilio_sid
-      : row.twilio_sid;
-  const newTwilioAuth =
-    "twilio_auth_token" in body &&
-    !String(body.twilio_auth_token).startsWith("****")
-      ? body.twilio_auth_token
-      : row.twilio_auth_token;
-  const newTwilioPhone =
-    "twilio_phone" in body ? body.twilio_phone : row.twilio_phone;
+  const newTelnyxPhone =
+    "telnyx_phone" in body ? body.telnyx_phone : (row.telnyx_phone || "");
   const newUltravoxKey =
     "ultravox_api_key" in body &&
     !String(body.ultravox_api_key).startsWith("****")
@@ -198,9 +185,7 @@ export async function PATCH(req: NextRequest) {
       opener_speaks_first = ${newOpenerSpeaksFirst},
       transfer_enabled = ${newTransferEnabled},
       closers = ${newClosers}::jsonb,
-      twilio_sid = ${newTwilioSid},
-      twilio_auth_token = ${newTwilioAuth},
-      twilio_phone = ${newTwilioPhone},
+      telnyx_phone = ${newTelnyxPhone},
       ultravox_api_key = ${newUltravoxKey},
       ultravox_agent_id = ${newUltravoxAgentId},
       ultravox_voice_id = ${newUltravoxVoiceId},

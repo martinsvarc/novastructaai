@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
-import twilio from "twilio";
-
-const APP_URL = (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").replace(/\/+$/, "");
 
 interface Closer {
   name: string;
@@ -13,21 +10,21 @@ interface Closer {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { callSid, accountSid: bodyAccountSid } = body;
+    const { callControlId } = body;
 
-    console.log("warmTransfer called — callSid:", callSid, "accountSid:", bodyAccountSid);
+    console.log("warmTransfer called — callControlId:", callControlId);
 
-    if (!callSid) {
-      console.error("warmTransfer: missing callSid");
+    if (!callControlId) {
+      console.error("warmTransfer: missing callControlId");
       return NextResponse.json({
         result: "error",
-        message: "Transfer not available — no call SID provided.",
+        message: "Transfer not available — no call control ID provided.",
       });
     }
 
     const sql = getDb();
     const settings = await sql`
-      SELECT twilio_sid, twilio_auth_token, twilio_phone, closers FROM settings WHERE id = 1
+      SELECT closers, telnyx_phone, transfer_connecting_msg FROM settings WHERE id = 1
     `;
 
     if (settings.length === 0) {
@@ -38,24 +35,17 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const { twilio_sid, twilio_auth_token, twilio_phone, closers, transfer_connecting_msg } = settings[0];
+    const { closers, telnyx_phone, transfer_connecting_msg } = settings[0];
+    const telnyxApiKey = process.env.TELNYX_API_KEY || "";
 
-    // Use accountSid passed directly in the body (from Twilio webhook params),
-    // falling back to what's stored in settings
-    const accountSid = bodyAccountSid || twilio_sid || "";
-
-    console.log("warmTransfer: accountSid resolved to:", accountSid ? accountSid.slice(0, 6) + "..." : "(empty)");
-    console.log("warmTransfer: auth token present:", !!twilio_auth_token);
-
-    if (!accountSid || !twilio_auth_token) {
-      console.error("warmTransfer: missing credentials — accountSid:", !!accountSid, "authToken:", !!twilio_auth_token);
+    if (!telnyxApiKey) {
+      console.error("warmTransfer: missing TELNYX_API_KEY");
       return NextResponse.json({
         result: "error",
-        message: `Transfer not configured — missing ${!accountSid ? "account SID" : "auth token"}.`,
+        message: "Transfer not configured — missing API key.",
       });
     }
 
-    const client = twilio(accountSid, twilio_auth_token);
     const sortedClosers = ((closers || []) as Closer[]).sort(
       (a, b) => a.priority - b.priority
     );
@@ -71,17 +61,39 @@ export async function POST(req: NextRequest) {
     const closer = sortedClosers[0];
     console.log("warmTransfer: transferring to", closer.name, closer.phone);
 
-    // Update the live Twilio call to dial the closer.
-    // This disconnects the Ultravox stream and connects the caller directly to the closer.
-    // Use <Dial> with caller ID set to the Twilio number so the closer sees a real number.
+    // Speak the connecting message first
     const connectMsg = transfer_connecting_msg || "Connecting you now.";
-    const dialTwiml = twilio_phone
-      ? `<Response><Say>${connectMsg}</Say><Dial callerId="${twilio_phone}" timeout="15" action="${APP_URL}/api/tools/warm-transfer/status"><Number>${closer.phone}</Number></Dial></Response>`
-      : `<Response><Say>${connectMsg}</Say><Dial timeout="15" action="${APP_URL}/api/tools/warm-transfer/status"><Number>${closer.phone}</Number></Dial></Response>`;
+    await fetch(`https://api.telnyx.com/v2/calls/${callControlId}/actions/speak`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${telnyxApiKey}` },
+      body: JSON.stringify({
+        payload: connectMsg,
+        language: "en-US",
+        voice: "female",
+      }),
+    });
 
-    await client.calls(callSid).update({ twiml: dialTwiml });
+    // Transfer the call to the closer via Telnyx Call Control
+    const transferRes = await fetch(`https://api.telnyx.com/v2/calls/${callControlId}/actions/transfer`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${telnyxApiKey}` },
+      body: JSON.stringify({
+        to: closer.phone,
+        from: telnyx_phone || undefined,
+        timeout_secs: 15,
+      }),
+    });
 
-    console.log("warmTransfer: Twilio call updated successfully");
+    if (!transferRes.ok) {
+      const err = await transferRes.text();
+      console.error("Telnyx transfer error:", transferRes.status, err);
+      return NextResponse.json({
+        result: "error",
+        message: `Transfer failed: ${err}`,
+      });
+    }
+
+    console.log("warmTransfer: Telnyx transfer initiated successfully");
 
     return NextResponse.json({
       result: "success",
