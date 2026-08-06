@@ -15,6 +15,16 @@ interface Channel {
   disqualified: number;
   dropped: number;
   connected_pct: number;
+  system_prompt: string;
+  opener: string;
+  opener_speaks_first: boolean;
+  scenario_a_script: string;
+  scenario_b_script: string;
+  closers: { name: string; phone: string; priority: number }[];
+  transfer_connecting_msg: string;
+  transfer_retry_msg: string;
+  transfer_error_msg: string;
+  business_hours: Record<string, { enabled: boolean; open: string; close: string }>;
 }
 
 interface TelnyxNumber {
@@ -66,6 +76,17 @@ export default function ChannelsPage() {
   // Inline name editing
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingName, setEditingName] = useState("");
+
+  // Expand/collapse for script editing
+  const [expandedChannelId, setExpandedChannelId] = useState<number | null>(null);
+  const [scriptDraft, setScriptDraft] = useState<{
+    opener: string;
+    system_prompt: string;
+    scenario_a_script: string;
+    scenario_b_script: string;
+  }>({ opener: "", system_prompt: "", scenario_a_script: "", scenario_b_script: "" });
+  const [savingScript, setSavingScript] = useState(false);
+  const [scriptSaved, setScriptSaved] = useState(false);
 
   const fetchChannels = useCallback(async () => {
     try {
@@ -178,6 +199,57 @@ export default function ChannelsPage() {
     setEditingName("");
   };
 
+  // --- Toggle script expansion ---
+  const toggleExpand = (ch: Channel) => {
+    if (expandedChannelId === ch.id) {
+      setExpandedChannelId(null);
+      setScriptSaved(false);
+    } else {
+      setExpandedChannelId(ch.id);
+      setScriptDraft({
+        opener: ch.opener || "",
+        system_prompt: ch.system_prompt || "",
+        scenario_a_script: ch.scenario_a_script || "",
+        scenario_b_script: ch.scenario_b_script || "",
+      });
+      setScriptSaved(false);
+    }
+  };
+
+  const saveScript = async () => {
+    if (expandedChannelId === null) return;
+    setSavingScript(true);
+    setScriptSaved(false);
+    try {
+      const res = await fetch("/api/channels", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: expandedChannelId,
+          system_prompt: scriptDraft.system_prompt,
+          opener: scriptDraft.opener,
+          scenario_a_script: scriptDraft.scenario_a_script,
+          scenario_b_script: scriptDraft.scenario_b_script,
+        }),
+      });
+      if (res.ok) {
+        setChannels((prev) =>
+          prev.map((ch) =>
+            ch.id === expandedChannelId
+              ? { ...ch, ...scriptDraft }
+              : ch
+          )
+        );
+        setScriptSaved(true);
+        setTimeout(() => setScriptSaved(false), 2500);
+      }
+    } catch (e) {
+      console.error("Failed to save script:", e);
+    } finally {
+      setSavingScript(false);
+    }
+  };
+
   // --- Derived stats ---
   const totals = channels.reduce(
     (acc, ch) => ({
@@ -245,111 +317,209 @@ export default function ChannelsPage() {
           <div></div>
         </div>
 
-        {channels.map((ch) => (
-          <div key={ch.id} className="channels-row">
-            {/* Name cell — editable */}
-            <div className="channel-name-cell">
-              <div className="channel-dot" style={{ background: ch.color }} />
-              {editingId === ch.id ? (
-                <input
-                  type="text"
-                  value={editingName}
-                  onChange={(e) => setEditingName(e.target.value)}
-                  onBlur={saveEdit}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") saveEdit();
-                    if (e.key === "Escape") setEditingId(null);
-                  }}
-                  className="channel-input"
-                  autoFocus
-                  style={{ maxWidth: 140 }}
-                />
-              ) : (
-                <span
-                  style={{ cursor: "text" }}
-                  title="Click to rename"
-                  onClick={() => startEdit(ch)}
-                >
-                  {ch.name}
-                </span>
-              )}
-            </div>
+        {channels.map((ch) => {
+          const isExpanded = expandedChannelId === ch.id;
+          return (
+            <div key={ch.id}>
+              <div
+                className="channels-row"
+                style={{ cursor: "pointer" }}
+                onClick={() => toggleExpand(ch)}
+              >
+                {/* Name cell — editable */}
+                <div className="channel-name-cell" onClick={(e) => e.stopPropagation()}>
+                  <div className="channel-dot" style={{ background: ch.color }} />
+                  {editingId === ch.id ? (
+                    <input
+                      type="text"
+                      value={editingName}
+                      onChange={(e) => setEditingName(e.target.value)}
+                      onBlur={saveEdit}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") saveEdit();
+                        if (e.key === "Escape") setEditingId(null);
+                      }}
+                      className="channel-input"
+                      autoFocus
+                      style={{ maxWidth: 140 }}
+                    />
+                  ) : (
+                    <span
+                      style={{ cursor: "text" }}
+                      title="Click to rename"
+                      onClick={() => startEdit(ch)}
+                    >
+                      {ch.name}
+                    </span>
+                  )}
+                </div>
 
-            <div className="channel-phone">{formatPhone(ch.phone)}</div>
-            <div className="channel-cell">{ch.total_calls}</div>
-            <div
-              className="channel-cell"
-              style={{ color: "var(--green, #4caf76)", fontWeight: 500 }}
-            >
-              {ch.transferred}
-            </div>
-            <div
-              className="channel-cell"
-              style={{ color: "var(--text-secondary)" }}
-            >
-              {ch.callbacks}
-            </div>
-            <div className="channel-cell">
-              <div className="conv-bar">
-                <span
-                  style={{
-                    color:
-                      ch.connected_pct >= 50
-                        ? "var(--green, #4caf76)"
-                        : "var(--text-primary)",
-                    fontWeight: ch.connected_pct >= 50 ? 600 : 400,
-                  }}
+                <div className="channel-phone">{formatPhone(ch.phone)}</div>
+                <div className="channel-cell">{ch.total_calls}</div>
+                <div
+                  className="channel-cell"
+                  style={{ color: "var(--green, #4caf76)", fontWeight: 500 }}
                 >
-                  {ch.connected_pct}%
-                </span>
-                <div className="conv-track">
-                  <div
-                    className="conv-fill"
-                    style={{
-                      width: `${ch.connected_pct}%`,
-                      background:
-                        ch.connected_pct >= 50
-                          ? "var(--green, #4caf76)"
-                          : "var(--whiskey)",
-                    }}
-                  />
+                  {ch.transferred}
+                </div>
+                <div
+                  className="channel-cell"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  {ch.callbacks}
+                </div>
+                <div className="channel-cell">
+                  <div className="conv-bar">
+                    <span
+                      style={{
+                        color:
+                          ch.connected_pct >= 50
+                            ? "var(--green, #4caf76)"
+                            : "var(--text-primary)",
+                        fontWeight: ch.connected_pct >= 50 ? 600 : 400,
+                      }}
+                    >
+                      {ch.connected_pct}%
+                    </span>
+                    <div className="conv-track">
+                      <div
+                        className="conv-fill"
+                        style={{
+                          width: `${ch.connected_pct}%`,
+                          background:
+                            ch.connected_pct >= 50
+                              ? "var(--green, #4caf76)"
+                              : "var(--whiskey)",
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Remove / confirm remove */}
+                <div className="channel-cell" onClick={(e) => e.stopPropagation()}>
+                  {confirmRemoveId === ch.id ? (
+                    <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--text-muted)", whiteSpace: "nowrap" }}>
+                      Release?&nbsp;
+                      <button
+                        onClick={() => removeChannel(ch.id)}
+                        disabled={removing}
+                        className="channel-save-btn"
+                        style={{ fontSize: 11, padding: "2px 8px" }}
+                      >
+                        {removing ? "…" : "Release"}
+                      </button>
+                      <button
+                        onClick={() => setConfirmRemoveId(null)}
+                        className="channel-cancel-btn"
+                        style={{ fontSize: 11, padding: "2px 8px" }}
+                      >
+                        Cancel
+                      </button>
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => setConfirmRemoveId(ch.id)}
+                      className="channel-remove"
+                      title="Release number"
+                    >
+                      ×
+                    </button>
+                  )}
                 </div>
               </div>
-            </div>
 
-            {/* Remove / confirm remove */}
-            <div className="channel-cell">
-              {confirmRemoveId === ch.id ? (
-                <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--text-muted)", whiteSpace: "nowrap" }}>
-                  Release?&nbsp;
-                  <button
-                    onClick={() => removeChannel(ch.id)}
-                    disabled={removing}
-                    className="channel-save-btn"
-                    style={{ fontSize: 11, padding: "2px 8px" }}
-                  >
-                    {removing ? "…" : "Release"}
-                  </button>
-                  <button
-                    onClick={() => setConfirmRemoveId(null)}
-                    className="channel-cancel-btn"
-                    style={{ fontSize: 11, padding: "2px 8px" }}
-                  >
-                    Cancel
-                  </button>
-                </span>
-              ) : (
-                <button
-                  onClick={() => setConfirmRemoveId(ch.id)}
-                  className="channel-remove"
-                  title="Release number"
-                >
-                  ×
-                </button>
+              {/* Script editor panel */}
+              {isExpanded && (
+                <div className="card" style={{ margin: "0 0 2px 0", borderRadius: 0, borderTop: "1px solid var(--border, rgba(255,255,255,0.06))", padding: "20px 24px" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 18, maxWidth: 720 }}>
+                    {/* Opener */}
+                    <div>
+                      <div className="card-title" style={{ marginBottom: 6 }}>OPENER</div>
+                      <input
+                        type="text"
+                        className="cred-input"
+                        value={scriptDraft.opener}
+                        onChange={(e) => setScriptDraft((d) => ({ ...d, opener: e.target.value }))}
+                        placeholder="e.g. Thanks for calling! How can I help you today?"
+                        style={{ width: "100%" }}
+                      />
+                    </div>
+
+                    {/* Main Script */}
+                    <div>
+                      <div className="card-title" style={{ marginBottom: 6 }}>MAIN SCRIPT</div>
+                      <textarea
+                        className="prompt-textarea"
+                        value={scriptDraft.system_prompt}
+                        onChange={(e) => setScriptDraft((d) => ({ ...d, system_prompt: e.target.value }))}
+                        placeholder="System prompt for this channel..."
+                        rows={6}
+                        style={{ width: "100%", resize: "vertical" }}
+                      />
+                      <div className="textarea-footer">
+                        <span className="char-count">{scriptDraft.system_prompt.length} chars</span>
+                      </div>
+                    </div>
+
+                    {/* Scenario A */}
+                    <div>
+                      <div className="card-title" style={{ marginBottom: 6 }}>SCENARIO A &mdash; ADVISORS BUSY</div>
+                      <textarea
+                        className="prompt-textarea"
+                        value={scriptDraft.scenario_a_script}
+                        onChange={(e) => setScriptDraft((d) => ({ ...d, scenario_a_script: e.target.value }))}
+                        placeholder="Script when all advisors are busy..."
+                        rows={4}
+                        style={{ width: "100%", resize: "vertical" }}
+                      />
+                      <div className="textarea-footer">
+                        <span className="char-count">{scriptDraft.scenario_a_script.length} chars</span>
+                      </div>
+                    </div>
+
+                    {/* Scenario B */}
+                    <div>
+                      <div className="card-title" style={{ marginBottom: 6 }}>SCENARIO B &mdash; AFTER HOURS</div>
+                      <textarea
+                        className="prompt-textarea"
+                        value={scriptDraft.scenario_b_script}
+                        onChange={(e) => setScriptDraft((d) => ({ ...d, scenario_b_script: e.target.value }))}
+                        placeholder="Script for after-hours calls..."
+                        rows={4}
+                        style={{ width: "100%", resize: "vertical" }}
+                      />
+                      <div className="textarea-footer">
+                        <span className="char-count">{scriptDraft.scenario_b_script.length} chars</span>
+                      </div>
+                    </div>
+
+                    {/* Footer */}
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <span style={{ color: "var(--text-muted)", fontSize: "0.75rem" }}>
+                        Leave fields empty to use the default script from Settings.
+                      </span>
+                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                        {scriptSaved && (
+                          <span style={{ color: "var(--green, #4caf76)", fontSize: "0.8rem", fontWeight: 500 }}>
+                            Saved
+                          </span>
+                        )}
+                        <button
+                          className="btn-primary"
+                          onClick={(e) => { e.stopPropagation(); saveScript(); }}
+                          disabled={savingScript}
+                        >
+                          {savingScript ? "Saving..." : "Save Changes"}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               )}
             </div>
-          </div>
-        ))}
+          );
+        })}
 
         {/* + Add Number row */}
         {showSearch ? (

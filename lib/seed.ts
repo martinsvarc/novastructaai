@@ -87,12 +87,34 @@ async function seed() {
       phone TEXT,
       color TEXT DEFAULT '#f3880e',
       telnyx_id TEXT DEFAULT '',
+      system_prompt TEXT DEFAULT '',
+      opener TEXT DEFAULT '',
+      opener_speaks_first BOOLEAN DEFAULT true,
+      scenario_a_script TEXT DEFAULT '',
+      scenario_b_script TEXT DEFAULT '',
+      closers JSONB DEFAULT '[]'::jsonb,
+      transfer_connecting_msg TEXT DEFAULT '',
+      transfer_retry_msg TEXT DEFAULT '',
+      transfer_error_msg TEXT DEFAULT '',
+      business_hours JSONB DEFAULT '{}'::jsonb,
       created_at TIMESTAMPTZ DEFAULT NOW()
     )
   `;
 
   // Add telnyx_id to channels if it doesn't exist (migration for existing deployments)
   await sql`ALTER TABLE channels ADD COLUMN IF NOT EXISTS telnyx_id TEXT DEFAULT ''`;
+
+  // Add script columns to channels if they don't exist (migration for existing deployments)
+  await sql`ALTER TABLE channels ADD COLUMN IF NOT EXISTS system_prompt TEXT DEFAULT ''`;
+  await sql`ALTER TABLE channels ADD COLUMN IF NOT EXISTS opener TEXT DEFAULT ''`;
+  await sql`ALTER TABLE channels ADD COLUMN IF NOT EXISTS opener_speaks_first BOOLEAN DEFAULT true`;
+  await sql`ALTER TABLE channels ADD COLUMN IF NOT EXISTS scenario_a_script TEXT DEFAULT ''`;
+  await sql`ALTER TABLE channels ADD COLUMN IF NOT EXISTS scenario_b_script TEXT DEFAULT ''`;
+  await sql`ALTER TABLE channels ADD COLUMN IF NOT EXISTS closers JSONB DEFAULT '[]'::jsonb`;
+  await sql`ALTER TABLE channels ADD COLUMN IF NOT EXISTS transfer_connecting_msg TEXT DEFAULT ''`;
+  await sql`ALTER TABLE channels ADD COLUMN IF NOT EXISTS transfer_retry_msg TEXT DEFAULT ''`;
+  await sql`ALTER TABLE channels ADD COLUMN IF NOT EXISTS transfer_error_msg TEXT DEFAULT ''`;
+  await sql`ALTER TABLE channels ADD COLUMN IF NOT EXISTS business_hours JSONB DEFAULT '{}'::jsonb`;
 
   // Seed calls
   // Base: July 8, 2026 at 3:00 PM ET (19:00 UTC)

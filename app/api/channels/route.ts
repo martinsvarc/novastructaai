@@ -36,6 +36,16 @@ export async function GET() {
       const connected = Number(s.transferred) + Number(s.callbacks) + Number(s.booked) + Number(s.after_hours);
       return {
         ...ch,
+        system_prompt: ch.system_prompt || "",
+        opener: ch.opener || "",
+        opener_speaks_first: ch.opener_speaks_first !== false,
+        scenario_a_script: ch.scenario_a_script || "",
+        scenario_b_script: ch.scenario_b_script || "",
+        closers: ch.closers || [],
+        transfer_connecting_msg: ch.transfer_connecting_msg || "",
+        transfer_retry_msg: ch.transfer_retry_msg || "",
+        transfer_error_msg: ch.transfer_error_msg || "",
+        business_hours: ch.business_hours || {},
         total_calls: total,
         transferred: Number(s.transferred) || 0,
         callbacks: Number(s.callbacks) || 0,
@@ -89,5 +99,52 @@ export async function DELETE(req: NextRequest) {
   } catch (error) {
     console.error("Channels DELETE error:", error);
     return NextResponse.json({ error: "Failed to delete channel" }, { status: 500 });
+  }
+}
+
+export async function PATCH(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { id, ...fields } = body;
+    if (!id) return NextResponse.json({ error: "ID required" }, { status: 400 });
+
+    const sql = getDb();
+
+    const current = await sql`SELECT * FROM channels WHERE id = ${id}`;
+    if (current.length === 0) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+    const row = current[0];
+    const newName = 'name' in fields ? fields.name : row.name;
+    const newSystemPrompt = 'system_prompt' in fields ? fields.system_prompt : (row.system_prompt || '');
+    const newOpener = 'opener' in fields ? fields.opener : (row.opener || '');
+    const newOpenerSpeaksFirst = 'opener_speaks_first' in fields ? Boolean(fields.opener_speaks_first) : (row.opener_speaks_first !== false);
+    const newScenarioA = 'scenario_a_script' in fields ? fields.scenario_a_script : (row.scenario_a_script || '');
+    const newScenarioB = 'scenario_b_script' in fields ? fields.scenario_b_script : (row.scenario_b_script || '');
+    const newClosers = 'closers' in fields ? JSON.stringify(fields.closers) : JSON.stringify(row.closers || []);
+    const newConnectMsg = 'transfer_connecting_msg' in fields ? fields.transfer_connecting_msg : (row.transfer_connecting_msg || '');
+    const newRetryMsg = 'transfer_retry_msg' in fields ? fields.transfer_retry_msg : (row.transfer_retry_msg || '');
+    const newErrorMsg = 'transfer_error_msg' in fields ? fields.transfer_error_msg : (row.transfer_error_msg || '');
+    const newBusinessHours = 'business_hours' in fields ? JSON.stringify(fields.business_hours) : JSON.stringify(row.business_hours || {});
+
+    await sql`
+      UPDATE channels SET
+        name = ${newName},
+        system_prompt = ${newSystemPrompt},
+        opener = ${newOpener},
+        opener_speaks_first = ${newOpenerSpeaksFirst},
+        scenario_a_script = ${newScenarioA},
+        scenario_b_script = ${newScenarioB},
+        closers = ${newClosers}::jsonb,
+        transfer_connecting_msg = ${newConnectMsg},
+        transfer_retry_msg = ${newRetryMsg},
+        transfer_error_msg = ${newErrorMsg},
+        business_hours = ${newBusinessHours}::jsonb
+      WHERE id = ${id}
+    `;
+
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.error("Channels PATCH error:", error);
+    return NextResponse.json({ error: "Failed to update channel" }, { status: 500 });
   }
 }

@@ -15,6 +15,7 @@ interface Call {
   recording_url: string;
   short_summary: string;
   created_at: string;
+  channel_phone?: string;
 }
 
 function fmtDur(s: number) {
@@ -200,10 +201,11 @@ function RecPlayer({ url, duration }: { url: string; duration: number }) {
   );
 }
 
-export function CallLog({ calls }: { calls: Call[] }) {
+export function CallLog({ calls, channels }: { calls: Call[]; channels?: { id: number; name: string; phone: string; color: string }[] }) {
   const { t } = useI18n();
   const [currentRange, setCurrentRange] = useState("7d");
   const [currentFilter, setCurrentFilter] = useState("all");
+  const [currentChannel, setCurrentChannel] = useState("all");
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [calStart, setCalStart] = useState<Date | null>(null);
   const [calEnd, setCalEnd] = useState<Date | null>(null);
@@ -228,9 +230,11 @@ export function CallLog({ calls }: { calls: Call[] }) {
   const visible = useMemo(
     () =>
       allInRange.filter(
-        (c) => currentFilter === "all" || c.outcome === currentFilter
+        (c) =>
+          (currentFilter === "all" || c.outcome === currentFilter) &&
+          (currentChannel === "all" || c.channel_phone === currentChannel)
       ),
-    [allInRange, currentFilter]
+    [allInRange, currentFilter, currentChannel]
   );
 
   const stats = useMemo(() => {
@@ -329,6 +333,40 @@ export function CallLog({ calls }: { calls: Call[] }) {
         <div className="page-tag">{t.inboundVoice}</div>
         <h2>{t.callLogTitle}</h2>
       </div>
+
+      {/* Channel filter */}
+      {channels && channels.length > 0 && (
+        <div className="toolbar" style={{ marginBottom: 0, paddingBottom: 0 }}>
+          <div className="toolbar-left">
+            <button
+              className={`pill ${currentChannel === "all" ? "active" : ""}`}
+              onClick={() => { setCurrentChannel("all"); setExpandedId(null); }}
+            >
+              All Channels
+            </button>
+            {channels.map((ch) => (
+              <button
+                key={ch.id}
+                className={`pill ${currentChannel === ch.phone ? "active" : ""}`}
+                onClick={() => { setCurrentChannel(ch.phone); setExpandedId(null); }}
+              >
+                <span
+                  style={{
+                    display: "inline-block",
+                    width: 6,
+                    height: 6,
+                    borderRadius: "50%",
+                    backgroundColor: ch.color,
+                    marginRight: 6,
+                    flexShrink: 0,
+                  }}
+                />
+                {ch.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Toolbar */}
       <div className="toolbar">

@@ -15,16 +15,30 @@ interface CallRow {
   recording_url: string;
   short_summary: string;
   created_at: string;
+  channel_phone?: string;
+}
+
+interface ChannelInfo {
+  id: number;
+  name: string;
+  phone: string;
+  color: string;
 }
 
 export default function CallLogPage() {
   const [calls, setCalls] = useState<CallRow[] | null>(null);
+  const [channels, setChannels] = useState<ChannelInfo[]>([]);
 
   useEffect(() => {
     fetch("/api/calls")
       .then((res) => (res.ok ? res.json() : []))
       .then((data) => setCalls(data))
       .catch(() => setCalls([]));
+
+    fetch("/api/channels")
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => setChannels(data))
+      .catch(() => setChannels([]));
   }, []);
 
   if (!calls) {
@@ -41,5 +55,5 @@ export default function CallLogPage() {
     );
   }
 
-  return <CallLog calls={calls} />;
+  return <CallLog calls={calls} channels={channels} />;
 }

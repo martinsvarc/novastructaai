@@ -159,6 +159,10 @@ export async function POST(req: NextRequest) {
 
     const settings = settingsRows[0];
 
+    // Check for channel-specific scripts
+    const channelRows = await sql`SELECT * FROM channels WHERE phone = ${channelPhone}`;
+    const channel = channelRows.length > 0 ? channelRows[0] : null;
+
     // Answer the call first via Telnyx Call Control
     const telnyxApiKey = process.env.TELNYX_API_KEY || "";
     await fetch(`https://api.telnyx.com/v2/calls/${callControlId}/actions/answer`, {
@@ -188,19 +192,22 @@ export async function POST(req: NextRequest) {
       timeSinceSubmission: getTimeSinceSubmission(lookup?.submittedAt),
     };
 
+    // Use channel script if it exists, otherwise fall back to global settings
     let systemPrompt = populatePrompt(
-      settings.system_prompt || "",
+      (channel?.system_prompt || settings.system_prompt || ""),
       templateVars
     );
 
-    const closers = (settings.closers || []) as Closer[];
+    const closers = ((channel?.closers?.length ? channel.closers : settings.closers) || []) as Closer[];
+
+    const channelBizHours = channel?.business_hours as Record<string, DayHours> | null;
     const duringBusinessHours = isBusinessHours(
-      settings.business_hours as Record<string, DayHours> | null
+      (channelBizHours && Object.keys(channelBizHours).length ? channelBizHours : settings.business_hours) as Record<string, DayHours> | null
     );
 
-    const scenarioAScript = settings.scenario_a_script ||
+    const scenarioAScript = channel?.scenario_a_script || settings.scenario_a_script ||
       "All our advisors are finishing up with other homeowners right now. I'm sending you a text right now so you stay at the front of the line. Just reply 'Hi' to confirm and an advisor will call you back within 15 minutes. Sound good?";
-    const scenarioBScript = settings.scenario_b_script ||
+    const scenarioBScript = channel?.scenario_b_script || settings.scenario_b_script ||
       "Great news — you do qualify for the program. Our advisors are off for the evening, but I don't want you to lose your spot. I'm locking in your information right now, and first thing tomorrow morning one of our advisors will give you a personal call. What time works best for you — earlier in the morning or later in the afternoon?";
 
     if (duringBusinessHours) {
@@ -372,8 +379,8 @@ ENDING CALLS: Never hang up abruptly. Always ask "Is there anything else before 
         model: "fixie-ai/ultravox-v0.7",
         voice: settings.ultravox_voice_id || undefined,
         medium: { telnyx: {} },
-        firstSpeakerSettings: settings.opener_speaks_first !== false
-          ? { agent: { text: settings.opener || "hey there" } }
+        firstSpeakerSettings: (channel?.opener_speaks_first !== undefined ? channel.opener_speaks_first !== false : settings.opener_speaks_first !== false)
+          ? { agent: { text: channel?.opener || settings.opener || "hey there" } }
           : { user: {} },
         recordingEnabled: true,
         selectedTools,
