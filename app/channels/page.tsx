@@ -188,15 +188,27 @@ export default function ChannelsPage() {
     setEditingName(ch.name);
   };
 
-  const saveEdit = () => {
+  const saveEdit = async () => {
     if (editingId === null) return;
+    const newName = editingName.trim();
+    if (!newName) { setEditingId(null); return; }
     setChannels((prev) =>
       prev.map((ch) =>
-        ch.id === editingId ? { ...ch, name: editingName.trim() || ch.name } : ch
+        ch.id === editingId ? { ...ch, name: newName } : ch
       )
     );
     setEditingId(null);
     setEditingName("");
+    // Persist to DB
+    try {
+      await fetch("/api/channels", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: editingId, name: newName }),
+      });
+    } catch (e) {
+      console.error("Failed to save channel name:", e);
+    }
   };
 
   // --- Toggle script expansion ---

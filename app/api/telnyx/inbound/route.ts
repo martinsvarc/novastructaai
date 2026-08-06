@@ -159,9 +159,15 @@ export async function POST(req: NextRequest) {
 
     const settings = settingsRows[0];
 
-    // Check for channel-specific scripts
-    const channelRows = await sql`SELECT * FROM channels WHERE phone = ${channelPhone}`;
+    // Check for channel-specific scripts — normalize phone for matching
+    const cleanChannelPhone = channelPhone.replace(/[^+\d]/g, "");
+    const channelRows = await sql`SELECT * FROM channels WHERE phone = ${cleanChannelPhone} OR phone = ${channelPhone}`;
     const channel = channelRows.length > 0 ? channelRows[0] : null;
+    if (channel) {
+      console.log("Channel matched:", channel.name, channel.phone, "— using channel-specific script:", !!channel.system_prompt);
+    } else {
+      console.log("No channel match for", channelPhone, "— using global settings");
+    }
 
     // Answer the call first via Telnyx Call Control
     const telnyxApiKey = process.env.TELNYX_API_KEY || "";
