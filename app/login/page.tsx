@@ -19,15 +19,14 @@ export default function LoginPage() {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: email.trim(), password: password.trim() }),
       });
 
       if (res.ok) {
         router.push("/");
         router.refresh();
       } else {
-        const data = await res.json().catch(() => null);
-        setError(data?.debug ? JSON.stringify(data.debug, null, 2) : "Invalid email or password");
+        setError("Invalid email or password");
       }
     } catch {
       setError("Something went wrong");
