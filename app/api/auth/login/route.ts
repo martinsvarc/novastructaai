@@ -23,7 +23,18 @@ export async function POST(req: NextRequest) {
       return res;
     }
 
-    return NextResponse.json({ ok: false, error: "Invalid credentials" }, { status: 401 });
+    return NextResponse.json({
+      ok: false,
+      error: "Invalid credentials",
+      debug: {
+        receivedEmail: email,
+        expectedEmail: VALID_EMAIL,
+        emailMatch: email === VALID_EMAIL,
+        passwordMatch: password === VALID_PASSWORD,
+        passwordLength: password.length,
+        expectedPasswordLength: VALID_PASSWORD.length,
+      },
+    }, { status: 401 });
   } catch (err) {
     console.error("Login error:", err);
     return NextResponse.json({ ok: false, error: "Bad request" }, { status: 400 });
