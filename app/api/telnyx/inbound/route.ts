@@ -392,7 +392,7 @@ ENDING CALLS: Never hang up abruptly. Always ask "Is there anything else before 
         model: "fixie-ai/ultravox-v0.7",
         voice: settings.ultravox_voice_id || undefined,
         medium: { serverWebSocket: {} },
-        callbacks: { ended: `${APP_URL}/api/webhooks/ultravox` },
+        callbacks: { ended: { url: `${APP_URL}/api/webhooks/ultravox` } },
         firstSpeakerSettings: (channel?.opener_speaks_first !== undefined ? channel.opener_speaks_first !== false : settings.opener_speaks_first !== false)
           ? { agent: { text: channel?.opener || settings.opener || "hey there" } }
           : { user: {} },
