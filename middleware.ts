@@ -6,7 +6,7 @@ export function middleware(req: NextRequest) {
   // Skip auth check for public routes
   if (
     pathname.startsWith("/login") ||
-    pathname.startsWith("/api/auth") ||
+    pathname.startsWith("/api") ||
     pathname.startsWith("/_next") ||
     pathname.includes(".")
   ) {
