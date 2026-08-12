@@ -391,7 +391,7 @@ ENDING CALLS: Never hang up abruptly. Always ask "Is there anything else before 
         systemPrompt,
         model: "fixie-ai/ultravox-v0.7",
         voice: settings.ultravox_voice_id || undefined,
-        medium: { serverWebSocket: { inputSampleRate: 8000, outputSampleRate: 8000 } },
+        medium: { telnyx: { callControlId, telnyxApiKey: telnyxApiKey } },
         callbacks: { ended: { url: `${APP_URL}/api/webhooks/ultravox` } },
         firstSpeakerSettings: (channel?.opener_speaks_first !== undefined ? channel.opener_speaks_first !== false : settings.opener_speaks_first !== false)
           ? { agent: { text: channel?.opener || settings.opener || "hey there" } }
@@ -436,31 +436,7 @@ ENDING CALLS: Never hang up abruptly. Always ask "Is there anything else before 
     }
 
     const ultravoxData = await ultravoxRes.json();
-    const joinUrl = ultravoxData.joinUrl;
-
-    console.log("Ultravox call created:", ultravoxData.callId, "joinUrl:", joinUrl ? joinUrl.substring(0, 60) + "..." : "MISSING");
-
-    if (!joinUrl) {
-      console.error("Ultravox returned no joinUrl. Full response:", JSON.stringify(ultravoxData));
-      return NextResponse.json({ ok: true });
-    }
-
-    // Connect the Telnyx call to Ultravox via streaming
-    const streamRes = await fetch(`https://api.telnyx.com/v2/calls/${callControlId}/actions/streaming_start`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${telnyxApiKey}` },
-      body: JSON.stringify({
-        stream_url: joinUrl,
-        stream_track: "both_tracks",
-      }),
-    });
-
-    if (!streamRes.ok) {
-      const streamErr = await streamRes.text();
-      console.error("Telnyx streaming_start error:", streamRes.status, streamErr);
-    } else {
-      console.log("Telnyx streaming_start success");
-    }
+    console.log("Ultravox call created:", ultravoxData.callId);
 
     return NextResponse.json({ ok: true });
   } catch (error) {
