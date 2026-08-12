@@ -438,8 +438,15 @@ ENDING CALLS: Never hang up abruptly. Always ask "Is there anything else before 
     const ultravoxData = await ultravoxRes.json();
     const joinUrl = ultravoxData.joinUrl;
 
+    console.log("Ultravox call created:", ultravoxData.callId, "joinUrl:", joinUrl ? joinUrl.substring(0, 60) + "..." : "MISSING");
+
+    if (!joinUrl) {
+      console.error("Ultravox returned no joinUrl. Full response:", JSON.stringify(ultravoxData));
+      return NextResponse.json({ ok: true });
+    }
+
     // Connect the Telnyx call to Ultravox via streaming
-    await fetch(`https://api.telnyx.com/v2/calls/${callControlId}/actions/streaming_start`, {
+    const streamRes = await fetch(`https://api.telnyx.com/v2/calls/${callControlId}/actions/streaming_start`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${telnyxApiKey}` },
       body: JSON.stringify({
@@ -447,6 +454,13 @@ ENDING CALLS: Never hang up abruptly. Always ask "Is there anything else before 
         stream_track: "both_tracks",
       }),
     });
+
+    if (!streamRes.ok) {
+      const streamErr = await streamRes.text();
+      console.error("Telnyx streaming_start error:", streamRes.status, streamErr);
+    } else {
+      console.log("Telnyx streaming_start success");
+    }
 
     return NextResponse.json({ ok: true });
   } catch (error) {
