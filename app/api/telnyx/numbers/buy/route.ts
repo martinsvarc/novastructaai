@@ -27,21 +27,43 @@ export async function POST(req: NextRequest) {
     const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").replace(/\/$/, "");
     const sql = getDb();
 
-    // Step 1: Check settings for telnyx_app_id. Create Call Control App if missing.
+    // Step 1: Get the TeXML Application ID.
+    // First check DB, then look up existing app "Call House", then create if needed.
     const settingsRows = await sql`SELECT telnyx_app_id FROM settings WHERE id = 1`;
     let telnyxAppId = settingsRows[0]?.telnyx_app_id || "";
 
     if (!telnyxAppId) {
-      const appRes = await fetch("https://api.telnyx.com/v2/call_control_applications", {
+      // Look up existing TeXML app by name
+      const listRes = await fetch("https://api.telnyx.com/v2/texml_applications?page[size]=50", {
+        headers: { Authorization: `Bearer ${apiKey}` },
+      });
+      if (listRes.ok) {
+        const listData = await listRes.json();
+        const existing = (listData.data || []).find(
+          (a: { friendly_name?: string }) =>
+            a.friendly_name === "Call House" || a.friendly_name === "Nova Structa AI"
+        );
+        if (existing) {
+          telnyxAppId = existing.id;
+          console.log(`Found existing TeXML app "${existing.friendly_name}": ${telnyxAppId}`);
+        }
+      }
+    }
+
+    if (!telnyxAppId) {
+      // Create a new TeXML Application
+      const appRes = await fetch("https://api.telnyx.com/v2/texml_applications", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${apiKey}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          application_name: "Nova Structa AI",
-          webhook_event_url: `${appUrl}/api/telnyx/inbound`,
-          webhook_event_failover_url: "",
+          friendly_name: "Call House",
+          voice_url: `${appUrl}/api/telnyx/inbound`,
+          voice_method: "POST",
+          status_callback: `${appUrl}/api/telnyx/status`,
+          status_callback_method: "POST",
           active: true,
         }),
       });
@@ -49,7 +71,7 @@ export async function POST(req: NextRequest) {
       if (!appRes.ok) {
         const errText = await appRes.text();
         return NextResponse.json(
-          { error: `Failed to create Telnyx Call Control App: ${errText}` },
+          { error: `Failed to create TeXML Application: ${errText}` },
           { status: 500 }
         );
       }
@@ -59,11 +81,15 @@ export async function POST(req: NextRequest) {
 
       if (!telnyxAppId) {
         return NextResponse.json(
-          { error: "Telnyx Call Control App created but no ID returned" },
+          { error: "TeXML Application created but no ID returned" },
           { status: 500 }
         );
       }
+      console.log(`Created TeXML Application "Call House": ${telnyxAppId}`);
+    }
 
+    // Cache the app ID in settings so we don't look it up every time
+    if (telnyxAppId && !settingsRows[0]?.telnyx_app_id) {
       await sql`UPDATE settings SET telnyx_app_id = ${telnyxAppId}, updated_at = NOW() WHERE id = 1`;
     }
 
@@ -87,25 +113,29 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Step 3: Look up the phone number resource ID via GET /v2/phone_numbers
-    const lookupParams = new URLSearchParams({ "filter[phone_number]": phoneNumber });
-    const lookupRes = await fetch(
-      `https://api.telnyx.com/v2/phone_numbers?${lookupParams.toString()}`,
-      {
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
-
+    // Step 3: Look up the phone number resource ID — retry a couple times
+    // since provisioning after order can take a moment.
     let telnyxPhoneId = "";
-    if (lookupRes.ok) {
-      const lookupData = await lookupRes.json();
-      telnyxPhoneId = lookupData.data?.[0]?.id || "";
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (attempt > 0) await new Promise((r) => setTimeout(r, 2000));
+      const lookupParams = new URLSearchParams({ "filter[phone_number]": phoneNumber });
+      const lookupRes = await fetch(
+        `https://api.telnyx.com/v2/phone_numbers?${lookupParams.toString()}`,
+        {
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+      if (lookupRes.ok) {
+        const lookupData = await lookupRes.json();
+        telnyxPhoneId = lookupData.data?.[0]?.id || "";
+        if (telnyxPhoneId) break;
+      }
     }
 
-    // Step 3b: Configure the number with the Call Control App
+    // Step 3b: Assign the number to the TeXML Application
     if (telnyxPhoneId) {
       const patchRes = await fetch(
         `https://api.telnyx.com/v2/phone_numbers/${telnyxPhoneId}`,
@@ -121,9 +151,12 @@ export async function POST(req: NextRequest) {
 
       if (!patchRes.ok) {
         const errText = await patchRes.text();
-        console.error(`Failed to configure phone number connection: ${errText}`);
-        // Non-fatal — proceed to insert into DB
+        console.error(`Failed to assign number to TeXML app: ${errText}`);
+      } else {
+        console.log(`Assigned ${phoneNumber} to TeXML app ${telnyxAppId}`);
       }
+    } else {
+      console.error(`Could not find phone number ${phoneNumber} after ordering — manual TeXML assignment needed`);
     }
 
     // Step 4: Pick a color based on current channel count, insert into channels
