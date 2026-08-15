@@ -368,32 +368,9 @@ export function CallLog({ calls, channels }: { calls: Call[]; channels?: { id: n
         </div>
       )}
 
-      {/* Toolbar */}
+      {/* Date range toolbar */}
       <div className="toolbar">
-        <div className="toolbar-left">
-          {["all", "transferred", "booked", "callback", "after_hours", "disqualified", "dropped"].map(
-            (f) => (
-              <button
-                key={f}
-                className={`pill ${currentFilter === f ? "active" : ""}`}
-                onClick={() => {
-                  setCurrentFilter(f);
-                  setExpandedId(null);
-                }}
-              >
-                {({
-                  all: t.all,
-                  transferred: t.transferred,
-                  booked: t.booked,
-                  callback: t.callback,
-                  after_hours: t.afterHours,
-                  disqualified: t.disqualified,
-                  dropped: t.dropped,
-                }[f] || f)}
-              </button>
-            )
-          )}
-        </div>
+        <div className="toolbar-left"></div>
         <div className="toolbar-right">
           {["today", "7d", "30d"].map((r) => (
             <button
@@ -493,44 +470,31 @@ export function CallLog({ calls, channels }: { calls: Call[]; channels?: { id: n
         </div>
       </div>
 
-      {/* Stats */}
+      {/* Stats — clickable as filters */}
       <div className="stats-bar">
-        <div className="stat-item">
-          <div className="stat-value">{stats.total}</div>
-          <div className="stat-label">
-            {t.total} · {rangeLabels[currentRange] || t.today}
-          </div>
-        </div>
-        <div className="stats-divider"></div>
-        <div className="stat-item">
-          <div className="stat-value gold">{stats.transferred}</div>
-          <div className="stat-label">{t.transferred}</div>
-        </div>
-        <div className="stats-divider"></div>
-        <div className="stat-item">
-          <div className="stat-value green">{stats.booked}</div>
-          <div className="stat-label">{t.booked}</div>
-        </div>
-        <div className="stats-divider"></div>
-        <div className="stat-item">
-          <div className="stat-value" style={{ color: "#64b5f6" }}>{stats.callback}</div>
-          <div className="stat-label">{t.callback}</div>
-        </div>
-        <div className="stats-divider"></div>
-        <div className="stat-item">
-          <div className="stat-value" style={{ color: "#b39ddb" }}>{stats.after_hours}</div>
-          <div className="stat-label">{t.afterHours}</div>
-        </div>
-        <div className="stats-divider"></div>
-        <div className="stat-item">
-          <div className="stat-value">{stats.disqualified}</div>
-          <div className="stat-label">{t.disqualified}</div>
-        </div>
-        <div className="stats-divider"></div>
-        <div className="stat-item">
-          <div className="stat-value">{stats.dropped}</div>
-          <div className="stat-label">{t.dropped}</div>
-        </div>
+        {([
+          { key: "all", value: stats.total, label: `${t.total} · ${rangeLabels[currentRange] || t.today}`, colorClass: "" },
+          { key: "transferred", value: stats.transferred, label: t.transferred, colorClass: "gold" },
+          { key: "booked", value: stats.booked, label: t.booked, colorClass: "green" },
+          { key: "callback", value: stats.callback, label: t.callback, colorClass: "blue" },
+          { key: "after_hours", value: stats.after_hours, label: t.afterHours, colorClass: "purple" },
+          { key: "disqualified", value: stats.disqualified, label: t.disqualified, colorClass: "" },
+          { key: "dropped", value: stats.dropped, label: t.dropped, colorClass: "" },
+        ] as const).map((s, i, arr) => (
+          <span key={s.key} style={{ display: "contents" }}>
+            <button
+              className={`stat-item stat-filter ${currentFilter === s.key ? "stat-active" : ""}`}
+              onClick={() => {
+                setCurrentFilter(currentFilter === s.key ? "all" : s.key);
+                setExpandedId(null);
+              }}
+            >
+              <div className={`stat-value ${s.colorClass}`}>{s.value}</div>
+              <div className="stat-label">{s.label}</div>
+            </button>
+            {i < arr.length - 1 && <div className="stats-divider"></div>}
+          </span>
+        ))}
       </div>
 
       {/* Call List */}
