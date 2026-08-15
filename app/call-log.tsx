@@ -552,20 +552,18 @@ export function CallLog({ calls: initialCalls, channels }: { calls: Call[]; chan
           { key: "after_hours", value: stats.after_hours, label: t.afterHours, colorClass: "purple" },
           { key: "disqualified", value: stats.disqualified, label: t.disqualified, colorClass: "" },
           { key: "dropped", value: stats.dropped, label: t.dropped, colorClass: "" },
-        ] as const).map((s, i, arr) => (
-          <span key={s.key} style={{ display: "contents" }}>
-            <button
-              className={`stat-item stat-filter ${currentFilter === s.key ? "stat-active" : ""}`}
-              onClick={() => {
-                setCurrentFilter(currentFilter === s.key ? "all" : s.key);
-                setExpandedId(null);
-              }}
-            >
-              <div className={`stat-value ${s.colorClass}`}>{s.value}</div>
-              <div className="stat-label">{s.label}</div>
-            </button>
-            {i < arr.length - 1 && <div className="stats-divider"></div>}
-          </span>
+        ] as const).map((s) => (
+          <button
+            key={s.key}
+            className={`stat-item stat-filter ${currentFilter === s.key ? "stat-active" : ""}`}
+            onClick={() => {
+              setCurrentFilter(currentFilter === s.key ? "all" : s.key);
+              setExpandedId(null);
+            }}
+          >
+            <div className={`stat-value ${s.colorClass}`}>{s.value}</div>
+            <div className="stat-label">{s.label}</div>
+          </button>
         ))}
       </div>
 
