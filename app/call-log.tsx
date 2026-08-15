@@ -201,11 +201,20 @@ function RecPlayer({ url, duration }: { url: string; duration: number }) {
   );
 }
 
-export function CallLog({ calls, channels }: { calls: Call[]; channels?: { id: number; name: string; phone: string; color: string }[] }) {
+const OUTCOMES = ["transferred", "booked", "callback", "after_hours", "disqualified", "dropped"] as const;
+
+export function CallLog({ calls: initialCalls, channels }: { calls: Call[]; channels?: { id: number; name: string; phone: string; color: string }[] }) {
   const { t } = useI18n();
+  const [calls, setCalls] = useState(initialCalls);
   const [currentRange, setCurrentRange] = useState("7d");
   const [currentFilter, setCurrentFilter] = useState("all");
   const [currentChannel, setCurrentChannel] = useState("all");
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editSummary, setEditSummary] = useState("");
+  const [editOutcome, setEditOutcome] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
 
   const channelMap = useMemo(() => {
     const map: Record<string, { name: string; color: string }> = {};
@@ -216,6 +225,59 @@ export function CallLog({ calls, channels }: { calls: Call[]; channels?: { id: n
     }
     return map;
   }, [channels]);
+  function startEditing(c: Call) {
+    setEditingId(c.id);
+    setEditName(c.lead_name);
+    setEditSummary(c.short_summary);
+    setEditOutcome(c.outcome);
+    setConfirmDeleteId(null);
+  }
+
+  function cancelEditing() {
+    setEditingId(null);
+    setConfirmDeleteId(null);
+  }
+
+  async function saveEdit(id: number) {
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/calls/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lead_name: editName,
+          short_summary: editSummary,
+          outcome: editOutcome,
+        }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setCalls((prev) => prev.map((c) => (c.id === id ? { ...c, ...updated } : c)));
+        setEditingId(null);
+      }
+    } catch (e) {
+      console.error("Failed to save:", e);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function deleteCall(id: number) {
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/calls/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        setCalls((prev) => prev.filter((c) => c.id !== id));
+        setExpandedId(null);
+        setConfirmDeleteId(null);
+      }
+    } catch (e) {
+      console.error("Failed to delete:", e);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [calStart, setCalStart] = useState<Date | null>(null);
   const [calEnd, setCalEnd] = useState<Date | null>(null);
@@ -587,38 +649,108 @@ export function CallLog({ calls, channels }: { calls: Call[]; channels?: { id: n
                 <div className={`call-detail ${isExp ? "show" : ""}`}>
                   <div className="detail-inner">
                     <div className="detail-content">
-                      <div className="detail-cols">
-                        <div>
-                          <div className="detail-label">{t.callSummary}</div>
-                          <div className="summary-text">
-                            {c.short_summary || t.noSummary}
+                      {editingId === c.id ? (
+                        /* ===== EDIT MODE ===== */
+                        <div className="detail-edit" onClick={(e) => e.stopPropagation()}>
+                          <div className="detail-edit-row">
+                            <div className="detail-edit-field">
+                              <label className="detail-label">Lead Name</label>
+                              <input
+                                className="detail-input"
+                                value={editName}
+                                onChange={(e) => setEditName(e.target.value)}
+                              />
+                            </div>
+                            <div className="detail-edit-field">
+                              <label className="detail-label">Outcome</label>
+                              <div className="detail-outcome-pills">
+                                {OUTCOMES.map((o) => (
+                                  <button
+                                    key={o}
+                                    className={`detail-outcome-pill ${o} ${editOutcome === o ? "active" : ""}`}
+                                    onClick={() => setEditOutcome(o)}
+                                  >
+                                    {o === "after_hours" ? "After Hours" : o.charAt(0).toUpperCase() + o.slice(1)}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="detail-edit-field" style={{ marginTop: 12 }}>
+                            <label className="detail-label">{t.callSummary}</label>
+                            <textarea
+                              className="detail-textarea"
+                              value={editSummary}
+                              onChange={(e) => setEditSummary(e.target.value)}
+                              rows={3}
+                            />
+                          </div>
+                          <div className="detail-edit-actions">
+                            <button className="detail-btn detail-btn-save" onClick={() => saveEdit(c.id)} disabled={saving}>
+                              {saving ? "Saving..." : "Save"}
+                            </button>
+                            <button className="detail-btn detail-btn-cancel" onClick={cancelEditing}>
+                              Cancel
+                            </button>
+                            <div style={{ flex: 1 }} />
+                            {confirmDeleteId === c.id ? (
+                              <span className="detail-delete-confirm">
+                                <span style={{ fontSize: "0.78rem", color: "var(--dim)" }}>Delete this call?</span>
+                                <button className="detail-btn detail-btn-delete" onClick={() => deleteCall(c.id)} disabled={saving}>
+                                  {saving ? "..." : "Yes, delete"}
+                                </button>
+                                <button className="detail-btn detail-btn-cancel" onClick={() => setConfirmDeleteId(null)}>
+                                  No
+                                </button>
+                              </span>
+                            ) : (
+                              <button className="detail-btn detail-btn-delete-trigger" onClick={() => setConfirmDeleteId(c.id)}>
+                                Delete
+                              </button>
+                            )}
                           </div>
                         </div>
-                        <div>
-                          <div className="detail-label">{t.recording}</div>
-                          {c.recording_url ? (
-                            <RecPlayer
-                              url={c.recording_url}
-                              duration={c.duration_seconds}
-                            />
-                          ) : (
-                            <div className="no-rec">{t.noRecording}</div>
-                          )}
-                          {c.ghl_contact_url && (
-                            <div className="detail-actions">
-                              <a
-                                href={c.ghl_contact_url}
-                                className="btn btn-ghost"
-                                onClick={(e) => e.stopPropagation()}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                              >
-                                {t.openInGhl} ↗
-                              </a>
+                      ) : (
+                        /* ===== VIEW MODE ===== */
+                        <div className="detail-cols">
+                          <div>
+                            <div className="detail-label">{t.callSummary}</div>
+                            <div className="summary-text">
+                              {c.short_summary || t.noSummary}
                             </div>
-                          )}
+                          </div>
+                          <div>
+                            <div className="detail-label">{t.recording}</div>
+                            {c.recording_url ? (
+                              <RecPlayer
+                                url={c.recording_url}
+                                duration={c.duration_seconds}
+                              />
+                            ) : (
+                              <div className="no-rec">{t.noRecording}</div>
+                            )}
+                            <div className="detail-actions">
+                              {c.ghl_contact_url && (
+                                <a
+                                  href={c.ghl_contact_url}
+                                  className="btn btn-ghost"
+                                  onClick={(e) => e.stopPropagation()}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  {t.openInGhl} ↗
+                                </a>
+                              )}
+                              <button
+                                className="btn btn-ghost"
+                                onClick={(e) => { e.stopPropagation(); startEditing(c); }}
+                              >
+                                Edit
+                              </button>
+                            </div>
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </div>
                   </div>
                 </div>

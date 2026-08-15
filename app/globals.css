@@ -1043,6 +1043,131 @@ body::after {
 
 .detail-actions .btn { font-size: 0.82rem; padding: 8px 16px; }
 
+/* ===== CALL EDIT MODE ===== */
+.detail-edit-row {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.detail-edit-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.detail-input {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 0.88rem;
+  color: var(--txt);
+  font-family: var(--body);
+  outline: none;
+  transition: border-color 0.2s;
+}
+.detail-input:focus { border-color: var(--orange); }
+
+.detail-textarea {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-size: 0.85rem;
+  color: var(--txt);
+  font-family: var(--body);
+  outline: none;
+  resize: vertical;
+  min-height: 60px;
+  line-height: 1.5;
+  transition: border-color 0.2s;
+}
+.detail-textarea:focus { border-color: var(--orange); }
+
+.detail-outcome-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.detail-outcome-pill {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--dim);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  font-family: var(--body);
+}
+.detail-outcome-pill:hover {
+  border-color: var(--mut);
+  color: var(--txt);
+}
+.detail-outcome-pill.active {
+  border-color: var(--orange);
+  color: var(--orange);
+  background: rgba(243, 136, 14, 0.08);
+}
+
+.detail-edit-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.detail-btn {
+  border: none;
+  border-radius: 6px;
+  padding: 7px 18px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: var(--body);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.detail-btn-save {
+  background: var(--orange);
+  color: #fff;
+}
+.detail-btn-save:hover { opacity: 0.9; }
+.detail-btn-save:disabled { opacity: 0.5; cursor: default; }
+
+.detail-btn-cancel {
+  background: transparent;
+  color: var(--dim);
+  border: 1px solid var(--line);
+}
+.detail-btn-cancel:hover { border-color: var(--mut); color: var(--txt); }
+
+.detail-btn-delete-trigger {
+  background: transparent;
+  color: var(--dim);
+  opacity: 0.6;
+}
+.detail-btn-delete-trigger:hover { color: #e55; opacity: 1; }
+
+.detail-btn-delete {
+  background: #e55;
+  color: #fff;
+}
+.detail-btn-delete:hover { background: #d33; }
+.detail-btn-delete:disabled { opacity: 0.5; }
+
+.detail-delete-confirm {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 /* ===== MISC ===== */
 .toast {
   position: fixed;
