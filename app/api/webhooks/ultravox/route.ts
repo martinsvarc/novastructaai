@@ -157,6 +157,63 @@ function detectOutcome(
   return { outcome: "dropped", outcomeSub: `${durationSeconds}s` };
 }
 
+function extractNameFromTranscript(
+  messages: UltravoxMessage[],
+  shortSummary: string
+): string {
+  // Strategy 1: Look for the user's response right after the agent asks for their name
+  for (let i = 0; i < messages.length - 1; i++) {
+    const msg = messages[i];
+    if (msg.role === "agent" && msg.text) {
+      const lower = msg.text.toLowerCase();
+      if (
+        lower.includes("your name") ||
+        lower.includes("who am i speaking") ||
+        lower.includes("can i get your name") ||
+        lower.includes("may i have your name") ||
+        lower.includes("what should i call you")
+      ) {
+        // Next user message likely contains the name
+        const reply = messages[i + 1];
+        if (reply?.role === "user" && reply.text) {
+          const cleaned = reply.text
+            .replace(/^(my name is|i'm|it's|this is|i am|yeah|yes|hey|hi|sure)\s*/i, "")
+            .replace(/[.,!?]+$/, "")
+            .trim();
+          // Validate: 1-3 words, starts with uppercase or is short enough to be a name
+          const words = cleaned.split(/\s+/);
+          if (words.length >= 1 && words.length <= 4 && cleaned.length > 1 && cleaned.length < 40) {
+            // Title-case the result
+            return words
+              .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+              .join(" ");
+          }
+        }
+      }
+    }
+  }
+
+  // Strategy 2: Extract from the short summary (Ultravox often includes the name)
+  const nameMatch = shortSummary.match(
+    /(?:caller|lead|customer|user|homeowner|person)\s+(?:named?\s+|is\s+|was\s+)?([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/
+  );
+  if (nameMatch) return nameMatch[1];
+
+  // Strategy 3: Check if agent addresses someone by name in the conversation
+  for (const msg of messages) {
+    if (msg.role === "agent" && msg.text) {
+      const match = msg.text.match(
+        /(?:thank you|thanks|great|okay|alright|nice to meet you|good to hear),?\s+([A-Z][a-z]{1,15})/
+      );
+      if (match && !["Sir", "Ma", "Man", "Mam", "There", "So", "Well", "Now", "Sure"].includes(match[1])) {
+        return match[1];
+      }
+    }
+  }
+
+  return "";
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -169,7 +226,7 @@ export async function POST(req: NextRequest) {
     const metadata = call.metadata || {};
     const contactId = metadata.contactId || "unknown";
     const leadPhone = metadata.leadPhone || "";
-    const leadName = metadata.leadName || "Unknown";
+    let leadName = metadata.leadName || "";
     const channelPhone = metadata.channelPhone || "";
 
     // Calculate duration
@@ -209,6 +266,12 @@ export async function POST(req: NextRequest) {
 
     const endReason = call.endReason || "";
     const shortSummary = call.shortSummary || "";
+
+    // Extract lead name from transcript if not provided by pre-call lookup
+    if (!leadName) {
+      leadName = extractNameFromTranscript(messages, shortSummary) || "Unknown";
+      console.log("Extracted name from transcript:", leadName);
+    }
     const { outcome, outcomeSub } = detectOutcome(
       messages,
       endReason,
