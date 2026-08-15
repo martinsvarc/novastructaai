@@ -39,6 +39,12 @@ function detectOutcome(
 
   console.log("detectOutcome — toolNames:", allToolNames, "endReason:", endReason);
 
+  // Check callback/scenario tools BEFORE transfer — if transfer failed and
+  // scenarioA was used, the real outcome is callback, not transferred.
+  if (allToolNames.includes("sendTextScenarioA")) {
+    return { outcome: "callback", outcomeSub: "Text sent — awaiting reply" };
+  }
+
   if (
     allToolNames.includes("transferCall") ||
     allToolNames.includes("warmTransfer") ||
@@ -69,10 +75,6 @@ function detectOutcome(
       }
     }
     return { outcome: "booked", outcomeSub: sub };
-  }
-
-  if (allToolNames.includes("sendTextScenarioA")) {
-    return { outcome: "callback", outcomeSub: "Text sent — awaiting reply" };
   }
 
   if (allToolNames.includes("notifyScenarioB")) {
