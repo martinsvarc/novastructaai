@@ -297,12 +297,16 @@ export async function POST(req: NextRequest) {
         ? `https://app.gohighlevel.com/v2/location/${GHL_LOCATION_ID}/contacts/detail/${contactId}`
         : "";
 
-    await sql`
+    const GHL_LOCATION = GHL_LOCATION_ID || "lmQk2oDHgL1OBDQdLRYC";
+
+    const insertedRows = await sql`
       INSERT INTO calls (lead_name, phone, outcome, outcome_sub, oneliner, ghl_contact_url, duration_seconds, recording_url, short_summary, channel_phone, created_at)
       VALUES (${leadName}, ${leadPhone}, ${outcome}, ${outcomeSub}, ${oneliner}, ${ghlContactUrl}, ${durationSeconds}, ${recordingUrl}, ${shortSummary}, ${channelPhone}, NOW())
+      RETURNING id
     `;
+    const callRowId = insertedRows[0]?.id;
 
-    // Fire end-of-call summary to N8N (non-blocking)
+    // Send end-of-call data to N8N and wait for response with GHL contact ID
     const n8nPayload = {
       leadName,
       leadPhone,
@@ -332,6 +336,21 @@ export async function POST(req: NextRequest) {
           body: JSON.stringify(n8nPayload),
         });
         console.log("N8N end-of-call webhook response:", n8nRes.status);
+
+        // If N8N responds with a GHL contact ID, update the call record
+        if (n8nRes.ok && callRowId) {
+          try {
+            const n8nData = await n8nRes.json();
+            const ghlId = n8nData.contactId || n8nData.contact_id || n8nData.ghlContactId || "";
+            if (ghlId) {
+              const ghlUrl = `https://app.gohighlevel.com/v2/location/${GHL_LOCATION}/contacts/detail/${ghlId}`;
+              await sql`UPDATE calls SET ghl_contact_url = ${ghlUrl} WHERE id = ${callRowId}`;
+              console.log(`Updated call ${callRowId} with GHL contact: ${ghlId}`);
+            }
+          } catch {
+            // Response wasn't JSON or had no contact ID — that's fine
+          }
+        }
       } catch (err) {
         console.error("N8N end-of-call webhook error:", err);
       }
