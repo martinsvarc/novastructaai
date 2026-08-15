@@ -298,6 +298,7 @@ export async function POST(req: NextRequest) {
     const n8nPayload = {
       leadName,
       leadPhone,
+      channelPhone,
       contactId,
       outcome,
       outcomeSub,
@@ -313,7 +314,7 @@ export async function POST(req: NextRequest) {
       createdAt: new Date().toISOString(),
     };
 
-    const n8nEndCallUrl = process.env.N8N_END_CALL_URL || "";
+    const n8nEndCallUrl = process.env.N8N_END_CALL_URL || "https://n8n.automatedsolarbiz.com/webhook/348bc6fe-ffed-4689-bd40-064bf723fda8";
     if (n8nEndCallUrl) {
       try {
         const n8nRes = await fetch(n8nEndCallUrl, {
