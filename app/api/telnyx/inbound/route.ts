@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { getDb } from "@/lib/db";
 
 const APP_URL_RAW =
@@ -15,6 +15,18 @@ interface DayHours {
   enabled: boolean;
   open: string;
   close: string;
+}
+
+function xmlResponse(xml: string) {
+  return new Response(xml, {
+    headers: { "Content-Type": "text/xml; charset=utf-8" },
+  });
+}
+
+function texmlError(message: string) {
+  return xmlResponse(
+    `<?xml version="1.0" encoding="UTF-8"?><Response><Say>${message}</Say></Response>`
+  );
 }
 
 function populatePrompt(
@@ -118,30 +130,70 @@ async function lookupContactBeforeCall(
   }
 }
 
+// Parse incoming request — supports TeXML (form-encoded) and Call Control (JSON)
+async function parseIncoming(req: NextRequest): Promise<{
+  callerPhone: string;
+  channelPhone: string;
+  callSid: string;
+  isInbound: boolean;
+} | null> {
+  const contentType = req.headers.get("content-type") || "";
+
+  if (contentType.includes("application/x-www-form-urlencoded")) {
+    // TeXML format
+    const formData = await req.formData();
+    const direction = (formData.get("Direction") as string) || "";
+    return {
+      callerPhone: (formData.get("From") as string) || "",
+      channelPhone: (formData.get("To") as string) || "",
+      callSid: (formData.get("CallSid") as string) || "",
+      isInbound: direction === "inbound",
+    };
+  }
+
+  // JSON — could be Call Control or JSON-mode TeXML
+  const body = await req.json();
+
+  // Call Control format
+  if (body?.data?.event_type) {
+    if (body.data.event_type !== "call.initiated") return null;
+    const payload = body.data.payload;
+    return {
+      callerPhone: payload.from || "",
+      channelPhone: payload.to || "",
+      callSid: payload.call_control_id || "",
+      isInbound: payload.direction === "incoming",
+    };
+  }
+
+  // JSON-mode TeXML
+  if (body.From && body.To) {
+    return {
+      callerPhone: body.From,
+      channelPhone: body.To,
+      callSid: body.CallSid || "",
+      isInbound: body.Direction === "inbound",
+    };
+  }
+
+  return null;
+}
+
 export async function POST(req: NextRequest) {
   try {
-    // Telnyx sends JSON webhooks
-    const webhook = await req.json();
-    const eventType = webhook?.data?.event_type;
+    const incoming = await parseIncoming(req);
 
-    // Only handle inbound call.initiated events
-    if (eventType !== "call.initiated") {
-      return NextResponse.json({ ok: true });
+    if (!incoming) {
+      return xmlResponse(`<?xml version="1.0" encoding="UTF-8"?><Response/>`);
     }
 
-    const payload = webhook.data.payload;
-
-    // CRITICAL: Ignore outbound calls to prevent infinite loops from warm-transfer
-    if (payload.direction !== "incoming") {
-      console.log("Ignoring non-incoming call:", payload.direction);
-      return NextResponse.json({ ok: true });
+    if (!incoming.isInbound) {
+      console.log("Ignoring non-inbound call");
+      return xmlResponse(`<?xml version="1.0" encoding="UTF-8"?><Response/>`);
     }
 
-    const callerPhone = payload.from || "";
-    const callControlId = payload.call_control_id || "";
-    const channelPhone = payload.to || "";
-
-    console.log("Telnyx inbound:", callerPhone, "→", channelPhone, "ccid:", callControlId);
+    const { callerPhone, channelPhone, callSid } = incoming;
+    console.log("Telnyx inbound:", callerPhone, "→", channelPhone, "sid:", callSid);
 
     const sql = getDb();
 
@@ -149,24 +201,12 @@ export async function POST(req: NextRequest) {
     const settingsRows = await sql`SELECT * FROM settings WHERE id = 1`;
 
     if (settingsRows.length === 0) {
-      // Answer and say not configured, then hang up
-      const telnyxApiKey = process.env.TELNYX_API_KEY || "";
-      await fetch(`https://api.telnyx.com/v2/calls/${callControlId}/actions/answer`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${telnyxApiKey}` },
-        body: JSON.stringify({ client_state: "" }),
-      });
-      await fetch(`https://api.telnyx.com/v2/calls/${callControlId}/actions/speak`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${telnyxApiKey}` },
-        body: JSON.stringify({ payload: "System not configured.", language: "en-US", voice: "female" }),
-      });
-      return NextResponse.json({ ok: true });
+      return texmlError("System not configured. Please try again later.");
     }
 
     const settings = settingsRows[0];
 
-    // Check for channel-specific scripts — normalize phone for matching
+    // Check for channel-specific scripts
     const cleanChannelPhone = channelPhone.replace(/[^+\d]/g, "");
     const channelRows = await sql`SELECT * FROM channels WHERE phone = ${cleanChannelPhone} OR phone = ${channelPhone}`;
     const channel = channelRows.length > 0 ? channelRows[0] : null;
@@ -175,14 +215,6 @@ export async function POST(req: NextRequest) {
     } else {
       console.log("No channel match for", channelPhone, "— using global settings");
     }
-
-    // Answer the call first via Telnyx Call Control
-    const telnyxApiKey = process.env.TELNYX_API_KEY || "";
-    await fetch(`https://api.telnyx.com/v2/calls/${callControlId}/actions/answer`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${telnyxApiKey}` },
-      body: JSON.stringify({ client_state: "" }),
-    });
 
     // Pre-call GHL lookup via N8N (2s timeout, fallback to empty strings)
     const lookup = await lookupContactBeforeCall(callerPhone);
@@ -317,7 +349,7 @@ ENDING CALLS: Never hang up abruptly. Always ask "Is there anything else before 
           defaultReaction: "AGENT_REACTION_SPEAKS",
           dynamicParameters: [],
           staticParameters: [
-            { name: "callControlId", location: "PARAMETER_LOCATION_BODY", value: callControlId },
+            { name: "callControlId", location: "PARAMETER_LOCATION_BODY", value: callSid },
             { name: "contactId", location: "PARAMETER_LOCATION_BODY", value: contactId },
           ],
           automaticParameters: [
@@ -380,7 +412,7 @@ ENDING CALLS: Never hang up abruptly. Always ask "Is there anything else before 
     // Use ULTRAVOX_API_KEY env var (set in Vercel), fall back to DB setting
     const ultravoxApiKey = process.env.ULTRAVOX_API_KEY || settings.ultravox_api_key || "";
 
-    // Create Ultravox call with Telnyx medium
+    // Create Ultravox call with Telnyx medium (empty — audio bridged via TeXML Stream)
     const ultravoxRes = await fetch("https://api.ultravox.ai/api/calls", {
       method: "POST",
       headers: {
@@ -391,7 +423,7 @@ ENDING CALLS: Never hang up abruptly. Always ask "Is there anything else before 
         systemPrompt,
         model: "fixie-ai/ultravox-v0.7",
         voice: settings.ultravox_voice_id || undefined,
-        medium: { telnyx: { callControlId, telnyxApiKey: telnyxApiKey } },
+        medium: { telnyx: {} },
         callbacks: { ended: { url: `${APP_URL}/api/webhooks/ultravox` } },
         firstSpeakerSettings: (channel?.opener_speaks_first !== undefined ? channel.opener_speaks_first !== false : settings.opener_speaks_first !== false)
           ? { agent: { text: channel?.opener || settings.opener || "hey there" } }
@@ -427,20 +459,31 @@ ENDING CALLS: Never hang up abruptly. Always ask "Is there anything else before 
     if (!ultravoxRes.ok) {
       const err = await ultravoxRes.text();
       console.error("Ultravox API error:", ultravoxRes.status, err);
-      await fetch(`https://api.telnyx.com/v2/calls/${callControlId}/actions/speak`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${telnyxApiKey}` },
-        body: JSON.stringify({ payload: "We are experiencing technical difficulties. Please try again later.", language: "en-US", voice: "female" }),
-      });
-      return NextResponse.json({ ok: true });
+      return texmlError("We are experiencing technical difficulties. Please try again later.");
     }
 
     const ultravoxData = await ultravoxRes.json();
-    console.log("Ultravox call created:", ultravoxData.callId);
+    const joinUrl = ultravoxData.joinUrl;
 
-    return NextResponse.json({ ok: true });
+    console.log("Ultravox call created:", ultravoxData.callId, "joinUrl:", joinUrl ? "OK" : "MISSING");
+
+    if (!joinUrl) {
+      console.error("No joinUrl in Ultravox response:", JSON.stringify(ultravoxData));
+      return texmlError("We are experiencing technical difficulties. Please try again later.");
+    }
+
+    // Return TeXML — Connect + Stream bridges audio bidirectionally to Ultravox
+    const texml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Connect>
+    <Stream url="${joinUrl}" bidirectionalMode="rtp" codec="L16" bidirectionalCodec="L16" bidirectionalSamplingRate="16000"/>
+  </Connect>
+</Response>`;
+
+    console.log("Returning TeXML Stream response");
+    return xmlResponse(texml);
   } catch (error) {
     console.error("Telnyx inbound error:", error);
-    return NextResponse.json({ error: "Internal error" }, { status: 500 });
+    return texmlError("We are experiencing technical difficulties. Please try again later.");
   }
 }
