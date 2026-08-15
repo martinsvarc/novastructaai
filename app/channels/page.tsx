@@ -204,19 +204,19 @@ export default function ChannelsPage() {
 
       {/* Stats bar */}
       <div className="stats-bar">
-        <div className="stat-item">
+        <div className="stat-item stat-filter">
           <div className="stat-value">{totals.calls}</div>
           <div className="stat-label">Total Calls · 30 Days</div>
         </div>
-        <div className="stat-item">
-          <div className="stat-value" style={{ color: "var(--whiskey)" }}>{totals.transferred}</div>
+        <div className="stat-item stat-filter">
+          <div className="stat-value gold">{totals.transferred}</div>
           <div className="stat-label">Transferred</div>
         </div>
-        <div className="stat-item">
-          <div className="stat-value" style={{ color: "#4caf76" }}>{totals.callbacks}</div>
+        <div className="stat-item stat-filter">
+          <div className="stat-value blue">{totals.callbacks}</div>
           <div className="stat-label">Callbacks</div>
         </div>
-        <div className="stat-item">
+        <div className="stat-item stat-filter">
           <div className="stat-value">{channels.length}</div>
           <div className="stat-label">Active Channels</div>
         </div>
@@ -240,18 +240,18 @@ export default function ChannelsPage() {
               <div className="channel-dot" style={{ background: ch.color }} />
               <span>{ch.name}</span>
               {ch.system_prompt && (
-                <span style={{ fontSize: "0.65rem", color: "var(--whiskey)", marginLeft: 6, fontWeight: 500, letterSpacing: "0.04em" }}>
+                <span style={{ fontSize: "0.65rem", color: "var(--orange)", marginLeft: 6, fontWeight: 500, letterSpacing: "0.04em" }}>
                   CUSTOM
                 </span>
               )}
             </div>
             <div className="channel-phone">{formatPhone(ch.phone)}</div>
             <div className="channel-cell">{ch.total_calls}</div>
-            <div className="channel-cell" style={{ color: "#4caf76", fontWeight: 500 }}>{ch.transferred}</div>
+            <div className="channel-cell" style={{ color: "var(--orange)", fontWeight: 500 }}>{ch.transferred}</div>
             <div className="channel-cell">
               <div className="conv-bar">
                 <span style={{
-                  color: ch.connected_pct >= 50 ? "#4caf76" : "var(--text-primary)",
+                  color: ch.connected_pct >= 50 ? "var(--orange)" : "var(--mut)",
                   fontWeight: ch.connected_pct >= 50 ? 600 : 400,
                 }}>
                   {ch.connected_pct}%
@@ -259,7 +259,6 @@ export default function ChannelsPage() {
                 <div className="conv-track">
                   <div className="conv-fill" style={{
                     width: `${ch.connected_pct}%`,
-                    background: ch.connected_pct >= 50 ? "#4caf76" : "var(--whiskey)",
                   }} />
                 </div>
               </div>
@@ -269,24 +268,24 @@ export default function ChannelsPage() {
                 onClick={() => router.push(`/channels/${ch.id}`)}
                 style={{
                   background: "none",
-                  border: "1px solid var(--graphite)",
+                  border: "1px solid var(--line)",
                   borderRadius: "var(--radius-sm)",
-                  color: "var(--text-secondary)",
+                  color: "var(--mut)",
                   fontSize: "0.78rem",
                   padding: "4px 12px",
                   cursor: "pointer",
-                  fontFamily: "var(--sans)",
+                  fontFamily: "var(--body)",
                   transition: "all 0.15s",
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--whiskey)"; e.currentTarget.style.color = "var(--whiskey)"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--graphite)"; e.currentTarget.style.color = "var(--text-secondary)"; }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--orange)"; e.currentTarget.style.color = "var(--orange)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--line)"; e.currentTarget.style.color = "var(--mut)"; }}
               >
                 Edit
               </button>
             </div>
             <div className="channel-cell">
               {confirmRemoveId === ch.id ? (
-                <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--text-muted)", whiteSpace: "nowrap" }}>
+                <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--dim)", whiteSpace: "nowrap" }}>
                   <button onClick={() => removeChannel(ch.id)} disabled={removing} className="channel-save-btn" style={{ fontSize: 11, padding: "2px 8px" }}>
                     {removing ? "…" : "Release"}
                   </button>
@@ -303,7 +302,7 @@ export default function ChannelsPage() {
 
         {/* + Add Number */}
         {showSearch ? (
-          <div style={{ padding: "14px 20px", borderTop: "1px solid var(--graphite)" }}>
+          <div style={{ padding: "14px 20px", borderTop: "1px solid var(--headrow)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: searchResults.length || searchError ? 12 : 0 }}>
               <input
                 type="text"
@@ -330,10 +329,10 @@ export default function ChannelsPage() {
                 {searchResults.map((num) => (
                   <div key={num.phone_number} style={{
                     display: "flex", alignItems: "center", justifyContent: "space-between",
-                    padding: "8px 12px", background: "var(--graphite)", borderRadius: 6, fontSize: 13,
+                    padding: "8px 12px", background: "var(--headrow)", borderRadius: 6, fontSize: 13,
                   }}>
                     <span style={{ fontFamily: "monospace", letterSpacing: "0.03em" }}>{formatPhone(num.phone_number)}</span>
-                    <span style={{ display: "flex", alignItems: "center", gap: 12, color: "var(--text-muted)" }}>
+                    <span style={{ display: "flex", alignItems: "center", gap: 12, color: "var(--dim)" }}>
                       <span style={{ fontSize: 12 }}>{num.monthly_cost}/mo</span>
                       <button onClick={() => { setConfirmNumber(num); setBuyError(""); }} className="channel-save-btn" style={{ fontSize: 12, padding: "3px 10px" }}>Buy</button>
                     </span>
@@ -345,10 +344,10 @@ export default function ChannelsPage() {
             {confirmNumber && (
               <div style={{
                 display: "flex", alignItems: "center", gap: 12,
-                padding: "10px 14px", background: "var(--graphite)", borderRadius: 6, fontSize: 13, marginTop: 4,
+                padding: "10px 14px", background: "var(--headrow)", borderRadius: 6, fontSize: 13, marginTop: 4,
               }}>
-                <span style={{ color: "var(--text-muted)" }}>
-                  Buy <strong style={{ color: "var(--text-primary)", fontFamily: "monospace" }}>{formatPhone(confirmNumber.phone_number)}</strong> for {confirmNumber.monthly_cost}/mo?
+                <span style={{ color: "var(--dim)" }}>
+                  Buy <strong style={{ color: "var(--txt)", fontFamily: "monospace" }}>{formatPhone(confirmNumber.phone_number)}</strong> for {confirmNumber.monthly_cost}/mo?
                 </span>
                 <button onClick={buyNumber} disabled={buying} className="channel-save-btn" style={{ fontSize: 12, padding: "3px 12px" }}>
                   {buying ? "Buying…" : "Confirm"}
@@ -359,8 +358,8 @@ export default function ChannelsPage() {
           </div>
         ) : (
           <div className="channels-row channels-add-trigger" onClick={() => setShowSearch(true)} style={{ cursor: "pointer" }}>
-            <div className="channel-name-cell" style={{ color: "var(--text-muted)" }}>
-              <div className="channel-dot" style={{ background: "transparent", border: "1px dashed var(--text-muted)" }} />
+            <div className="channel-name-cell" style={{ color: "var(--dim)" }}>
+              <div className="channel-dot" style={{ background: "transparent", border: "1px dashed var(--dim)" }} />
               + Add Number
             </div>
           </div>
@@ -389,8 +388,8 @@ export default function ChannelsPage() {
             })}
           </div>
           <div className="chart-legend">
-            <div className="legend-item"><div className="legend-dot" style={{ background: "var(--whiskey)" }} /> Transferred</div>
-            <div className="legend-item"><div className="legend-dot" style={{ background: "var(--whiskey)", opacity: 0.35 }} /> Other calls</div>
+            <div className="legend-item"><div className="legend-dot" style={{ background: "var(--orange)" }} /> Transferred</div>
+            <div className="legend-item"><div className="legend-dot" style={{ background: "var(--orange)", opacity: 0.35 }} /> Other calls</div>
           </div>
         </div>
       )}
