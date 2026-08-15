@@ -1352,7 +1352,9 @@ body::after {
   display: flex;
   align-items: flex-end;
   gap: 16px;
-  height: 160px;
+  min-height: 160px;
+  padding-bottom: 28px;
+  position: relative;
 }
 
 .chart-bar-group {
@@ -1361,7 +1363,6 @@ body::after {
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  height: 100%;
   justify-content: flex-end;
 }
 
