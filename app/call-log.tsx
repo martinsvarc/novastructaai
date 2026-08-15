@@ -442,8 +442,7 @@ export function CallLog({ calls: initialCalls, channels }: { calls: Call[]; chan
 
       {/* Date range toolbar */}
       <div className="toolbar">
-        <div className="toolbar-left"></div>
-        <div className="toolbar-right">
+        <div className="toolbar-left">
           {["today", "7d", "30d"].map((r) => (
             <button
               key={r}
