@@ -112,10 +112,19 @@ export default function ChannelDetailPage() {
 
   if (loading) {
     return (
-      <div>
+      <div className="skeleton-fade-in">
         <div className="page-header">
           <div className="page-tag">Channel</div>
-          <h2>Loading...</h2>
+          <div className="skeleton" style={{ width: 160, height: 24, marginTop: 6 }} />
+        </div>
+        <div className="skeleton-card">
+          <div className="skeleton" style={{ width: 100, height: 14, marginBottom: 16 }} />
+          <div className="skeleton" style={{ width: "60%", height: 14, marginBottom: 10 }} />
+          <div className="skeleton" style={{ width: "40%", height: 14 }} />
+        </div>
+        <div className="skeleton-card" style={{ opacity: 0.7 }}>
+          <div className="skeleton" style={{ width: 110, height: 14, marginBottom: 16 }} />
+          <div className="skeleton" style={{ width: "100%", height: 100, borderRadius: 8 }} />
         </div>
       </div>
     );
