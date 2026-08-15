@@ -243,6 +243,14 @@ export async function POST(req: NextRequest) {
     }
 
     const sql = getDb();
+
+    // Look up channel name from DB
+    let channelName = "";
+    if (channelPhone) {
+      const chRows = await sql`SELECT name FROM channels WHERE phone = ${channelPhone} LIMIT 1`;
+      channelName = chRows[0]?.name || "";
+    }
+
     const settingsRows = await sql`SELECT ultravox_api_key FROM settings WHERE id = 1`;
     const apiKey = process.env.ULTRAVOX_API_KEY || settingsRows[0]?.ultravox_api_key || "";
 
@@ -299,6 +307,7 @@ export async function POST(req: NextRequest) {
       leadName,
       leadPhone,
       channelPhone,
+      channelName,
       contactId,
       outcome,
       outcomeSub,
