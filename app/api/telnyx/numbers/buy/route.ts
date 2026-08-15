@@ -28,9 +28,10 @@ export async function POST(req: NextRequest) {
     const sql = getDb();
 
     // Step 1: Get the TeXML Application ID.
-    // First check DB, then look up existing app "Call House", then create if needed.
+    // First check DB, then env/hardcoded, then look up existing app, then create if needed.
+    const TEXML_APP_ID = process.env.TELNYX_TEXML_APP_ID || "3027126994623006149";
     const settingsRows = await sql`SELECT telnyx_app_id FROM settings WHERE id = 1`;
-    let telnyxAppId = settingsRows[0]?.telnyx_app_id || "";
+    let telnyxAppId = settingsRows[0]?.telnyx_app_id || TEXML_APP_ID;
 
     if (!telnyxAppId) {
       // Look up existing TeXML app by name
