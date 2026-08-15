@@ -585,36 +585,40 @@ export function CallLog({ calls, channels }: { calls: Call[]; channels?: { id: n
                   </div>
                 </div>
                 <div className={`call-detail ${isExp ? "show" : ""}`}>
-                  <div className="detail-cols">
-                    <div>
-                      <div className="detail-label">{t.callSummary}</div>
-                      <div className="summary-text">
-                        {c.short_summary || t.noSummary}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="detail-label">{t.recording}</div>
-                      {c.recording_url ? (
-                        <RecPlayer
-                          url={c.recording_url}
-                          duration={c.duration_seconds}
-                        />
-                      ) : (
-                        <div className="no-rec">{t.noRecording}</div>
-                      )}
-                      {c.ghl_contact_url && (
-                        <div className="detail-actions">
-                          <a
-                            href={c.ghl_contact_url}
-                            className="btn btn-ghost"
-                            onClick={(e) => e.stopPropagation()}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            {t.openInGhl} ↗
-                          </a>
+                  <div className="detail-inner">
+                    <div className="detail-content">
+                      <div className="detail-cols">
+                        <div>
+                          <div className="detail-label">{t.callSummary}</div>
+                          <div className="summary-text">
+                            {c.short_summary || t.noSummary}
+                          </div>
                         </div>
-                      )}
+                        <div>
+                          <div className="detail-label">{t.recording}</div>
+                          {c.recording_url ? (
+                            <RecPlayer
+                              url={c.recording_url}
+                              duration={c.duration_seconds}
+                            />
+                          ) : (
+                            <div className="no-rec">{t.noRecording}</div>
+                          )}
+                          {c.ghl_contact_url && (
+                            <div className="detail-actions">
+                              <a
+                                href={c.ghl_contact_url}
+                                className="btn btn-ghost"
+                                onClick={(e) => e.stopPropagation()}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                {t.openInGhl} ↗
+                              </a>
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
