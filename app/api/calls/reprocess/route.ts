@@ -61,6 +61,10 @@ function extractNameFromTranscript(
   );
   if (nameMatch) return nameMatch[1];
 
+  // Strategy 2b: Name at the very start of the summary (e.g. "Morin qualified for...")
+  const startMatch = shortSummary.match(/^([A-Z][a-z]{1,15}(?:\s+[A-Z][a-z]{1,15})?)\s+(?:qualified|called|asked|wanted|inquired|expressed|is\s+interested|was\s+interested|said|mentioned|confirmed|agreed|requested)/);
+  if (startMatch) return startMatch[1];
+
   for (const msg of messages) {
     if (msg.role === "agent" && msg.text) {
       const match = msg.text.match(
@@ -125,12 +129,58 @@ function detectOutcome(
 
   const summary = shortSummary.toLowerCase();
 
-  if (summary.includes("callback") || summary.includes("text sent") || summary.includes("front of the line")) {
+  // Check callback BEFORE transferred in summary — if both words appear,
+  // "callback" is the real outcome (transfer failed, fallback text sent)
+  if (
+    summary.includes("callback") ||
+    summary.includes("text sent") ||
+    summary.includes("reply hi") ||
+    summary.includes("front of the line") ||
+    summary.includes("advisor unavailability")
+  ) {
     return { outcome: "callback", outcomeSub: "Text sent" };
   }
 
-  if (summary.includes("after hours") || summary.includes("tomorrow morning") || summary.includes("locked in")) {
+  if (
+    summary.includes("transferred") ||
+    summary.includes("transfer") ||
+    summary.includes("connecting") ||
+    summary.includes("connected to")
+  ) {
+    return { outcome: "transferred", outcomeSub: "→ Closer" };
+  }
+
+  if (
+    summary.includes("booked") ||
+    summary.includes("scheduled") ||
+    summary.includes("appointment") ||
+    summary.includes("consultation")
+  ) {
+    return { outcome: "booked", outcomeSub: "" };
+  }
+
+  if (
+    summary.includes("after hours") ||
+    summary.includes("tomorrow morning") ||
+    summary.includes("locked in") ||
+    summary.includes("advisors are off")
+  ) {
     return { outcome: "after_hours", outcomeSub: "Morning callback" };
+  }
+
+  // Check agent transcript for disqualification
+  const agentText = messages
+    .filter((m) => m.role === "agent" && m.text)
+    .map((m) => m.text!.toLowerCase())
+    .join(" ");
+
+  if (
+    agentText.includes("not a homeowner") ||
+    agentText.includes("renter") ||
+    summary.includes("renter") ||
+    summary.includes("not a homeowner")
+  ) {
+    return { outcome: "disqualified", outcomeSub: "Renter" };
   }
 
   if (durationSeconds < 30) {
@@ -165,6 +215,7 @@ export async function POST(req: NextRequest) {
       if (messages.length === 0) continue;
 
       const shortSummary = call.short_summary || "";
+      console.log(`Reprocessing call ${call.id}: summary="${shortSummary}", messages=${messages.length}`);
       const { outcome, outcomeSub } = detectOutcome(messages, "", call.duration_seconds || 0, shortSummary);
 
       let leadName = call.lead_name;

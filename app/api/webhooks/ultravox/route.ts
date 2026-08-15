@@ -199,6 +199,10 @@ function extractNameFromTranscript(
   );
   if (nameMatch) return nameMatch[1];
 
+  // Strategy 2b: Name at the very start of the summary (e.g. "Morin qualified for...")
+  const startMatch = shortSummary.match(/^([A-Z][a-z]{1,15}(?:\s+[A-Z][a-z]{1,15})?)\s+(?:qualified|called|asked|wanted|inquired|expressed|is\s+interested|was\s+interested|said|mentioned|confirmed|agreed|requested)/);
+  if (startMatch) return startMatch[1];
+
   // Strategy 3: Check if agent addresses someone by name in the conversation
   for (const msg of messages) {
     if (msg.role === "agent" && msg.text) {
