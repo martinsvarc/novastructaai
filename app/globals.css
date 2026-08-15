@@ -792,10 +792,42 @@ body::after {
   white-space: nowrap;
 }
 
+.call-route {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .call-phone {
   font-size: 0.8rem;
   color: var(--dim);
   font-weight: 400;
+}
+
+.call-route-arrow {
+  font-size: 0.75rem;
+  color: var(--dim);
+  opacity: 0.5;
+}
+
+.call-channel-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid;
+  background: transparent;
+}
+
+.call-channel-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 
 .call-meta {

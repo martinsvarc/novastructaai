@@ -206,6 +206,16 @@ export function CallLog({ calls, channels }: { calls: Call[]; channels?: { id: n
   const [currentRange, setCurrentRange] = useState("7d");
   const [currentFilter, setCurrentFilter] = useState("all");
   const [currentChannel, setCurrentChannel] = useState("all");
+
+  const channelMap = useMemo(() => {
+    const map: Record<string, { name: string; color: string }> = {};
+    if (channels) {
+      for (const ch of channels) {
+        map[ch.phone] = { name: ch.name, color: ch.color };
+      }
+    }
+    return map;
+  }, [channels]);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [calStart, setCalStart] = useState<Date | null>(null);
   const [calEnd, setCalEnd] = useState<Date | null>(null);
@@ -522,7 +532,21 @@ export function CallLog({ calls, channels }: { calls: Call[]; channels?: { id: n
                   <div className="call-body">
                     <div className="call-top-line">
                       <span className="call-name">{c.lead_name}</span>
-                      <span className="call-phone">{fmtPhone(c.phone)}</span>
+                      <span className="call-route">
+                        <span className="call-phone">{fmtPhone(c.phone)}</span>
+                        {c.channel_phone && channelMap[c.channel_phone] && (
+                          <>
+                            <span className="call-route-arrow">→</span>
+                            <span
+                              className="call-channel-tag"
+                              style={{ borderColor: channelMap[c.channel_phone].color + "66", color: channelMap[c.channel_phone].color }}
+                            >
+                              <span className="call-channel-dot" style={{ background: channelMap[c.channel_phone].color }} />
+                              {channelMap[c.channel_phone].name}
+                            </span>
+                          </>
+                        )}
+                      </span>
                     </div>
                     <div className="call-meta">{c.oneliner}</div>
                   </div>
