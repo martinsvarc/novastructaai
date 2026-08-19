@@ -17,11 +17,18 @@ interface Channel {
   dropped: number;
   connected_pct: number;
   system_prompt: string;
+  close_mode: string;
+  ghl_calendar_id: string;
 }
 
 interface TelnyxNumber {
   phone_number: string;
   monthly_cost: string;
+}
+
+interface GhlCalendar {
+  id: string;
+  name: string;
 }
 
 const CHANNEL_COLORS = [
@@ -66,6 +73,10 @@ export default function ChannelsPage() {
   const [confirmRemoveId, setConfirmRemoveId] = useState<number | null>(null);
   const [removing, setRemoving] = useState(false);
 
+  // GHL calendars
+  const [ghlCalendars, setGhlCalendars] = useState<GhlCalendar[]>([]);
+  const [savingChannel, setSavingChannel] = useState<number | null>(null);
+
   const fetchChannels = useCallback(async () => {
     try {
       const res = await fetch("/api/channels");
@@ -78,6 +89,29 @@ export default function ChannelsPage() {
   }, []);
 
   useEffect(() => { fetchChannels(); }, [fetchChannels]);
+
+  useEffect(() => {
+    fetch("/api/crm/calendars")
+      .then((res) => res.json())
+      .then((data) => { if (Array.isArray(data)) setGhlCalendars(data); })
+      .catch(() => {});
+  }, []);
+
+  const updateChannel = async (id: number, fields: Partial<Channel>) => {
+    setSavingChannel(id);
+    try {
+      await fetch("/api/channels", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, ...fields }),
+      });
+      setChannels((prev) => prev.map((ch) => ch.id === id ? { ...ch, ...fields } : ch));
+    } catch (e) {
+      console.error("Failed to update channel:", e);
+    } finally {
+      setSavingChannel(null);
+    }
+  };
 
   const searchNumbers = async () => {
     if (areaCode.length !== 3) return;
@@ -227,8 +261,8 @@ export default function ChannelsPage() {
         <div className="channels-header">
           <div>Channel</div>
           <div>Number</div>
+          <div>Close Mode</div>
           <div>Calls</div>
-          <div>Transferred</div>
           <div>Connected %</div>
           <div></div>
           <div></div>
@@ -246,8 +280,68 @@ export default function ChannelsPage() {
               )}
             </div>
             <div className="channel-phone">{formatPhone(ch.phone)}</div>
+            <div className="channel-cell" style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 220 }}>
+              <div style={{ display: "flex", background: "var(--headrow)", borderRadius: 6, overflow: "hidden", flexShrink: 0 }}>
+                <button
+                  onClick={() => updateChannel(ch.id, { close_mode: "transfer" })}
+                  style={{
+                    padding: "4px 10px",
+                    fontSize: "0.72rem",
+                    fontWeight: 500,
+                    border: "none",
+                    cursor: "pointer",
+                    fontFamily: "var(--body)",
+                    transition: "all 0.15s",
+                    background: (ch.close_mode || "transfer") === "transfer" ? "var(--orange)" : "transparent",
+                    color: (ch.close_mode || "transfer") === "transfer" ? "#fff" : "var(--mut)",
+                  }}
+                >
+                  Transfer
+                </button>
+                <button
+                  onClick={() => updateChannel(ch.id, { close_mode: "booking" })}
+                  style={{
+                    padding: "4px 10px",
+                    fontSize: "0.72rem",
+                    fontWeight: 500,
+                    border: "none",
+                    cursor: "pointer",
+                    fontFamily: "var(--body)",
+                    transition: "all 0.15s",
+                    background: ch.close_mode === "booking" ? "var(--orange)" : "transparent",
+                    color: ch.close_mode === "booking" ? "#fff" : "var(--mut)",
+                  }}
+                >
+                  Booking
+                </button>
+              </div>
+              {ch.close_mode === "booking" && (
+                <select
+                  value={ch.ghl_calendar_id || ""}
+                  onChange={(e) => updateChannel(ch.id, { ghl_calendar_id: e.target.value })}
+                  style={{
+                    background: "var(--headrow)",
+                    border: "1px solid var(--line)",
+                    borderRadius: 6,
+                    color: "var(--txt)",
+                    fontSize: "0.72rem",
+                    padding: "4px 8px",
+                    fontFamily: "var(--body)",
+                    maxWidth: 160,
+                    cursor: "pointer",
+                  }}
+                >
+                  <option value="">Select calendar</option>
+                  {ghlCalendars.map((cal) => (
+                    <option key={cal.id} value={cal.id}>{cal.name}</option>
+                  ))}
+                </select>
+              )}
+              {savingChannel === ch.id && (
+                <span style={{ fontSize: "0.65rem", color: "var(--orange)" }}>saving...</span>
+              )}
+            </div>
             <div className="channel-cell">{ch.total_calls}</div>
-            <div className="channel-cell" style={{ color: "var(--orange)", fontWeight: 500 }}>{ch.transferred}</div>
             <div className="channel-cell">
               <div className="conv-bar">
                 <span style={{
