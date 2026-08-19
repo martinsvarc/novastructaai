@@ -18,6 +18,7 @@ interface CallDetails {
   decision_makers?: string;
   address?: string;
   appointment?: string;
+  disqualify_reason?: string;
 }
 
 async function fetchCallMessages(
@@ -37,13 +38,75 @@ async function fetchCallMessages(
   }
 }
 
+const EXTRACT_PROMPT = `Extract qualification details from this solar sales call transcript. Return ONLY a JSON object with these fields (omit any that weren't discussed):
+
+- homeowner: Did they confirm they own the home? (e.g. "Yes, owns the home" or "Renter")
+- location: City and state (e.g. "Tampa, FL")
+- dwelling: Property type (e.g. "Single family home", "Duplex", "Townhome")
+- bill: Monthly electric bill (e.g. "$700/mo")
+- credit: Credit score range (e.g. "650-700")
+- roof: Roof age and condition (e.g. "10 years old, good shape")
+- shade: Sun exposure (e.g. "Mostly sunny, some trees need trimming")
+- decision_makers: Who decides? (e.g. "Solo decision maker" or "Spouse needs to be present")
+- address: Property address if given
+- appointment: Booked appointment time if any
+- disqualify_reason: If disqualified, why (e.g. "Renter", "Credit below 650", "Out of service area")
+
+Keep values short and clean. Return valid JSON only, no markdown.`;
+
+async function extractCallDetails(messages: UltravoxMessage[]): Promise<CallDetails> {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) return {};
+
+  const transcript = messages
+    .filter((m) => (m.role === "agent" || m.role === "user" || m.role === "MESSAGE_ROLE_AGENT" || m.role === "MESSAGE_ROLE_USER") && m.text)
+    .map((m) => {
+      const role = m.role.includes("AGENT") || m.role === "agent" ? "Agent" : "Caller";
+      return `${role}: ${m.text!.trim()}`;
+    })
+    .join("\n");
+
+  if (transcript.length < 50) return {};
+
+  try {
+    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: "google/gemini-flash-1.5-8b",
+        messages: [
+          { role: "system", content: EXTRACT_PROMPT },
+          { role: "user", content: transcript },
+        ],
+        temperature: 0,
+      }),
+    });
+
+    if (!res.ok) {
+      console.error("OpenRouter extraction error:", res.status);
+      return {};
+    }
+
+    const data = await res.json();
+    const content = data.choices?.[0]?.message?.content || "";
+    const jsonStr = content.replace(/^```json?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
+    return JSON.parse(jsonStr) as CallDetails;
+  } catch (err) {
+    console.error("Call details extraction error:", err);
+    return {};
+  }
+}
+
 function extractNameFromTranscript(
   messages: UltravoxMessage[],
   shortSummary: string
 ): string {
   for (let i = 0; i < messages.length - 1; i++) {
     const msg = messages[i];
-    if (msg.role === "agent" && msg.text) {
+    if ((msg.role === "agent" || msg.role === "MESSAGE_ROLE_AGENT") && msg.text) {
       const lower = msg.text.toLowerCase();
       if (
         lower.includes("your name") ||
@@ -53,7 +116,7 @@ function extractNameFromTranscript(
         lower.includes("what should i call you")
       ) {
         const reply = messages[i + 1];
-        if (reply?.role === "user" && reply.text) {
+        if (reply && (reply.role === "user" || reply.role === "MESSAGE_ROLE_USER") && reply.text) {
           const cleaned = reply.text
             .replace(/^(my name is|i'm|it's|this is|i am|yeah|yes|hey|hi|sure)\s*/i, "")
             .replace(/[.,!?]+$/, "")
@@ -78,7 +141,7 @@ function extractNameFromTranscript(
   if (startMatch) return startMatch[1];
 
   for (const msg of messages) {
-    if (msg.role === "agent" && msg.text) {
+    if ((msg.role === "agent" || msg.role === "MESSAGE_ROLE_AGENT") && msg.text) {
       const match = msg.text.match(
         /(?:thank you|thanks|great|okay|alright|nice to meet you|good to hear),?\s+([A-Z][a-z]{1,15})/
       );
@@ -179,7 +242,7 @@ function detectOutcome(
   }
 
   const agentText = messages
-    .filter((m) => m.role === "agent" && m.text)
+    .filter((m) => (m.role === "agent" || m.role === "MESSAGE_ROLE_AGENT") && m.text)
     .map((m) => m.text!.toLowerCase())
     .join(" ");
 
@@ -199,72 +262,12 @@ function detectOutcome(
   return { outcome: "dropped", outcomeSub: `${durationSeconds}s` };
 }
 
-function extractCallDetails(messages: UltravoxMessage[]): CallDetails {
-  const details: CallDetails = {};
-
-  for (let i = 0; i < messages.length - 1; i++) {
-    const msg = messages[i];
-    if (msg.role !== "agent" || !msg.text) continue;
-    const lower = msg.text.toLowerCase();
-
-    let reply = "";
-    for (let j = i + 1; j < messages.length; j++) {
-      if (messages[j].role === "user" && messages[j].text) {
-        reply = messages[j].text!.trim();
-        break;
-      }
-      if (messages[j].role === "agent") break;
-    }
-    if (!reply) continue;
-
-    if (!details.homeowner && (lower.includes("own the home") || lower.includes("own your home") || lower.includes("renting right now") || lower.includes("homeowner"))) {
-      details.homeowner = reply;
-    }
-    if (!details.location && (lower.includes("whereabouts") || lower.includes("located") || lower.includes("city and state") || lower.includes("where are you"))) {
-      details.location = reply;
-    }
-    if (!details.dwelling && (lower.includes("townhome") || lower.includes("condo") || lower.includes("single family") || lower.includes("type deal") || lower.includes("house or") || lower.includes("type of home"))) {
-      details.dwelling = reply;
-    }
-    if (!details.bill && (lower.includes("electric bill") || lower.includes("bill runs") || lower.includes("bill run"))) {
-      details.bill = reply;
-    }
-    if (!details.credit && lower.includes("credit") && (lower.includes("score") || lower.includes("looking like") || lower.includes("ballpark") || lower.includes("roughly"))) {
-      details.credit = reply;
-    }
-    if (!details.roof && lower.includes("roof") && (lower.includes("old") || lower.includes("shape") || lower.includes("age") || lower.includes("decent"))) {
-      details.roof = reply;
-    }
-    if (!details.shade && (lower.includes("shaded") || lower.includes("shade") || (lower.includes("sun") && lower.includes("roof")) || (lower.includes("tree") && lower.includes("roof")))) {
-      details.shade = reply;
-    }
-    if (!details.decision_makers && (lower.includes("spouse") || lower.includes("decision") || lower.includes("co-owner") || lower.includes("anyone else"))) {
-      details.decision_makers = reply;
-    }
-    if (!details.address && (lower.includes("address") || (lower.includes("property") && lower.includes("pull up")))) {
-      details.address = reply;
-    }
-  }
-
-  for (const msg of messages) {
-    if (msg.role === "tool_result" && msg.toolName === "bookAppointment" && msg.text) {
-      try {
-        const r = JSON.parse(msg.text);
-        if (r.appointmentTime) details.appointment = r.appointmentTime;
-        else if (r.time) details.appointment = r.time;
-      } catch { /* not json */ }
-    }
-  }
-
-  return details;
-}
-
 function buildOneliner(details: CallDetails, fallback: string): string {
   const parts: string[] = [];
-  if (details.location) parts.push(details.location.replace(/^\s+/, ""));
-  if (details.dwelling) parts.push(details.dwelling.replace(/^\s+/, ""));
-  if (details.bill) parts.push(details.bill.replace(/^\s+/, ""));
-  if (details.credit) parts.push("Credit " + details.credit.replace(/^\s+/, ""));
+  if (details.location) parts.push(details.location);
+  if (details.dwelling) parts.push(details.dwelling);
+  if (details.bill) parts.push(details.bill);
+  if (details.credit) parts.push("Credit " + details.credit);
   if (parts.length >= 2) return parts.join(" · ").slice(0, 100);
   return fallback.slice(0, 80);
 }
@@ -279,11 +282,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No Ultravox API key" }, { status: 500 });
     }
 
-    // Get ALL calls that have recordings (callId embedded in recording_url)
+    // Get ALL calls that have recordings
     const calls = await sql`SELECT id, recording_url, short_summary, duration_seconds, lead_name, call_details FROM calls ORDER BY id DESC`;
 
     let updated = 0;
     let skipped = 0;
+    const results: { id: number; fields: number; name: string }[] = [];
 
     for (const call of calls) {
       const recUrl = call.recording_url || "";
@@ -302,9 +306,10 @@ export async function POST(req: NextRequest) {
         leadName = extractNameFromTranscript(messages, shortSummary) || "Unknown";
       }
 
-      // Extract structured call details
-      const callDetails = extractCallDetails(messages);
-      const callDetailsJson = Object.keys(callDetails).length > 0 ? JSON.stringify(callDetails) : null;
+      // LLM-based extraction
+      const callDetails = await extractCallDetails(messages);
+      const fieldCount = Object.keys(callDetails).length;
+      const callDetailsJson = fieldCount > 0 ? JSON.stringify(callDetails) : null;
       const oneliner = callDetailsJson ? buildOneliner(callDetails, shortSummary) : shortSummary.slice(0, 80) || "";
 
       await sql`
@@ -313,10 +318,11 @@ export async function POST(req: NextRequest) {
         WHERE id = ${call.id}
       `;
       updated++;
-      console.log(`Reprocessed call ${call.id}: outcome=${outcome}, name=${leadName}, details=${Object.keys(callDetails).length} fields`);
+      results.push({ id: call.id, fields: fieldCount, name: leadName });
+      console.log(`Reprocessed call ${call.id}: outcome=${outcome}, name=${leadName}, details=${fieldCount} fields`);
     }
 
-    return NextResponse.json({ ok: true, updated, skipped });
+    return NextResponse.json({ ok: true, updated, skipped, results });
   } catch (error) {
     console.error("Reprocess error:", error);
     return NextResponse.json({ error: "Internal error" }, { status: 500 });

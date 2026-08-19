@@ -20,80 +20,75 @@ interface CallDetails {
   decision_makers?: string;
   address?: string;
   appointment?: string;
+  disqualify_reason?: string;
 }
 
+const EXTRACT_PROMPT = `Extract qualification details from this solar sales call transcript. Return ONLY a JSON object with these fields (omit any that weren't discussed):
+
+- homeowner: Did they confirm they own the home? (e.g. "Yes, owns the home" or "Renter")
+- location: City and state (e.g. "Tampa, FL")
+- dwelling: Property type (e.g. "Single family home", "Duplex", "Townhome")
+- bill: Monthly electric bill (e.g. "$700/mo")
+- credit: Credit score range (e.g. "650-700")
+- roof: Roof age and condition (e.g. "10 years old, good shape")
+- shade: Sun exposure (e.g. "Mostly sunny, some trees need trimming")
+- decision_makers: Who decides? (e.g. "Solo decision maker" or "Spouse needs to be present")
+- address: Property address if given
+- appointment: Booked appointment time if any
+- disqualify_reason: If disqualified, why (e.g. "Renter", "Credit below 650", "Out of service area")
+
+Keep values short and clean. Return valid JSON only, no markdown.`;
+
 /**
- * Scan agent/user message pairs and extract structured qualification data.
+ * Use LLM to extract structured call details from transcript.
  */
-function extractCallDetails(messages: UltravoxMessage[]): CallDetails {
-  const details: CallDetails = {};
+async function extractCallDetails(messages: UltravoxMessage[]): Promise<CallDetails> {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) return {};
 
-  for (let i = 0; i < messages.length - 1; i++) {
-    const msg = messages[i];
-    if (msg.role !== "agent" || !msg.text) continue;
-    const lower = msg.text.toLowerCase();
+  // Build a clean transcript string
+  const transcript = messages
+    .filter((m) => (m.role === "agent" || m.role === "user" || m.role === "MESSAGE_ROLE_AGENT" || m.role === "MESSAGE_ROLE_USER") && m.text)
+    .map((m) => {
+      const role = m.role.includes("AGENT") || m.role === "agent" ? "Agent" : "Caller";
+      return `${role}: ${m.text!.trim()}`;
+    })
+    .join("\n");
 
-    // Find next user reply
-    let reply = "";
-    for (let j = i + 1; j < messages.length; j++) {
-      if (messages[j].role === "user" && messages[j].text) {
-        reply = messages[j].text!.trim();
-        break;
-      }
-      if (messages[j].role === "agent") break;
-    }
-    if (!reply) continue;
+  if (transcript.length < 50) return {};
 
-    // Gate 1: Homeowner
-    if (!details.homeowner && (lower.includes("own the home") || lower.includes("own your home") || lower.includes("renting right now") || lower.includes("homeowner"))) {
-      details.homeowner = reply;
+  try {
+    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: "google/gemini-flash-1.5-8b",
+        messages: [
+          { role: "system", content: EXTRACT_PROMPT },
+          { role: "user", content: transcript },
+        ],
+        temperature: 0,
+      }),
+    });
+
+    if (!res.ok) {
+      console.error("OpenRouter extraction error:", res.status);
+      return {};
     }
-    // Gate 2: Location
-    if (!details.location && (lower.includes("whereabouts") || lower.includes("located") || lower.includes("city and state") || lower.includes("where are you"))) {
-      details.location = reply;
-    }
-    // Gate 3: Dwelling
-    if (!details.dwelling && (lower.includes("townhome") || lower.includes("condo") || lower.includes("single family") || lower.includes("type deal") || lower.includes("house or") || lower.includes("type of home"))) {
-      details.dwelling = reply;
-    }
-    // Gate 4: Electric bill
-    if (!details.bill && (lower.includes("electric bill") || lower.includes("bill runs") || lower.includes("bill run"))) {
-      details.bill = reply;
-    }
-    // Gate 5: Credit
-    if (!details.credit && lower.includes("credit") && (lower.includes("score") || lower.includes("looking like") || lower.includes("ballpark") || lower.includes("roughly"))) {
-      details.credit = reply;
-    }
-    // Roof
-    if (!details.roof && lower.includes("roof") && (lower.includes("old") || lower.includes("shape") || lower.includes("age") || lower.includes("decent"))) {
-      details.roof = reply;
-    }
-    // Shade
-    if (!details.shade && (lower.includes("shaded") || lower.includes("shade") || (lower.includes("sun") && lower.includes("roof")) || (lower.includes("tree") && lower.includes("roof")))) {
-      details.shade = reply;
-    }
-    // Decision makers
-    if (!details.decision_makers && (lower.includes("spouse") || lower.includes("decision") || lower.includes("co-owner") || lower.includes("anyone else"))) {
-      details.decision_makers = reply;
-    }
-    // Address
-    if (!details.address && (lower.includes("address") || (lower.includes("property") && lower.includes("pull up")))) {
-      details.address = reply;
-    }
+
+    const data = await res.json();
+    const content = data.choices?.[0]?.message?.content || "";
+    // Strip markdown code fences if present
+    const jsonStr = content.replace(/^```json?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
+    const parsed = JSON.parse(jsonStr);
+    return parsed as CallDetails;
+  } catch (err) {
+    console.error("Call details extraction error:", err);
+    return {};
   }
-
-  // Check for booked appointment
-  for (const msg of messages) {
-    if (msg.role === "tool_result" && msg.toolName === "bookAppointment" && msg.text) {
-      try {
-        const r = JSON.parse(msg.text);
-        if (r.appointmentTime) details.appointment = r.appointmentTime;
-        else if (r.time) details.appointment = r.time;
-      } catch { /* not json */ }
-    }
-  }
-
-  return details;
 }
 
 /**
@@ -393,7 +388,7 @@ export async function POST(req: NextRequest) {
     );
 
     // Extract structured qualification details from transcript
-    const callDetails = messages.length > 0 ? extractCallDetails(messages) : null;
+    const callDetails = messages.length > 0 ? await extractCallDetails(messages) : null;
     const callDetailsJson = callDetails && Object.keys(callDetails).length > 0 ? JSON.stringify(callDetails) : null;
 
     const oneliner = metadata.oneliner || (callDetails ? buildOneliner(callDetails, shortSummary) : shortSummary.slice(0, 80)) || "";

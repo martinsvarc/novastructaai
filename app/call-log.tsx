@@ -14,6 +14,7 @@ interface CallDetails {
   decision_makers?: string;
   address?: string;
   appointment?: string;
+  disqualify_reason?: string;
 }
 
 interface Call {
@@ -740,6 +741,7 @@ export function CallLog({ calls: initialCalls, channels }: { calls: Call[]; chan
                                   { key: "decision_makers", label: "Decision Makers", icon: "M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" },
                                   { key: "address", label: "Address", icon: "M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0zM12 7v6M9 10h6" },
                                   { key: "appointment", label: "Appointment", icon: "M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z" },
+                                  { key: "disqualify_reason", label: "Disqualified", icon: "M18 6L6 18M6 6l12 12" },
                                 ] as const).map(({ key, label, icon }) => {
                                   const val = c.call_details?.[key as keyof CallDetails];
                                   if (!val) return null;
