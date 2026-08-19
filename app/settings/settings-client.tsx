@@ -38,6 +38,10 @@ interface Settings {
   inactivity_2_seconds: number;
   inactivity_2_message: string;
   vad_sensitivity: number;
+  booking_intro_msg: string;
+  booking_confirm_msg: string;
+  booking_fail_msg: string;
+  booking_min_hours_ahead: number;
 }
 
 interface GhlStatus {
@@ -165,6 +169,12 @@ export function SettingsClient({
   const [vadSensitivity, setVadSensitivity] = useState(initialSettings.vad_sensitivity);
   const [saving, setSaving] = useState(false);
 
+  // Booking settings
+  const [bookingIntroMsg, setBookingIntroMsg] = useState(initialSettings.booking_intro_msg);
+  const [bookingConfirmMsg, setBookingConfirmMsg] = useState(initialSettings.booking_confirm_msg);
+  const [bookingFailMsg, setBookingFailMsg] = useState(initialSettings.booking_fail_msg);
+  const [bookingMinHoursAhead, setBookingMinHoursAhead] = useState(initialSettings.booking_min_hours_ahead);
+
   // Credentials
   const [telnyxPhone, setTelnyxPhone] = useState(
     initialSettings.telnyx_phone
@@ -232,6 +242,10 @@ export function SettingsClient({
         ultravox_agent_id: ultravoxAgentId,
         ultravox_voice_id: ultravoxVoiceId,
         ghl_calendar_id: ghlCalendarId,
+        booking_intro_msg: bookingIntroMsg,
+        booking_confirm_msg: bookingConfirmMsg,
+        booking_fail_msg: bookingFailMsg,
+        booking_min_hours_ahead: bookingMinHoursAhead,
       };
 
       if (!ultravoxKey.startsWith("****")) body.ultravox_api_key = ultravoxKey;
@@ -254,7 +268,8 @@ export function SettingsClient({
     scenarioAScript, scenarioBScript, transferConnectingMsg, transferRetryMsg,
     scenarioAOpener, transferErrorMsg, inactivity1Seconds, inactivity1Message,
     inactivity2Seconds, inactivity2Message, vadSensitivity, telnyxPhone, ultravoxAgentId,
-    ultravoxVoiceId, ghlCalendarId, ultravoxKey,
+    ultravoxVoiceId, ghlCalendarId, ultravoxKey, bookingIntroMsg, bookingConfirmMsg,
+    bookingFailMsg, bookingMinHoursAhead,
   ]);
 
   useEffect(() => {
@@ -286,6 +301,14 @@ export function SettingsClient({
     </span>
   );
 
+  const fieldDesc = {
+    fontSize: "0.78rem" as const,
+    color: "var(--text-secondary)",
+    fontWeight: 300 as const,
+    marginBottom: "12px",
+    lineHeight: 1.6,
+  };
+
   return (
     <div>
       <div className="page-header">
@@ -299,12 +322,61 @@ export function SettingsClient({
         </p>
       </div>
 
-      {/* ─────────────── SECTION 1: CALL ROUTING ─────────────── */}
+      {/* ─────────────── SECTION 1: AI SCRIPT & VOICE ─────────────── */}
       <Section
-        title={t.callRouting}
-        subtitle={t.callRoutingDesc}
+        title={t.aiScripts}
+        subtitle={t.aiScriptsDesc}
         defaultOpen={true}
       >
+        {/* Opener */}
+        <div className="card">
+          <div className="card-header">
+            <div className="card-title">{t.opener}</div>
+          </div>
+          <p style={{ ...fieldDesc, marginBottom: "16px" }}>{t.openerDesc}</p>
+          <input
+            type="text"
+            className="cred-input"
+            value={opener}
+            onChange={(e) => setOpener(e.target.value)}
+            placeholder="Hi, thanks for calling Nova Structa. Who am I speaking with?"
+            style={{ width: "100%", fontSize: "0.95rem" }}
+          />
+          <div className="toggle-row" style={{ marginTop: "20px" }}>
+            <div className="toggle-label">
+              <strong>{t.aiSpeaksFirst}</strong>
+              <span>{t.aiSpeaksFirstDesc}</span>
+            </div>
+            <label className="toggle-switch">
+              <input
+                type="checkbox"
+                checked={openerSpeaksFirst}
+                onChange={(e) => setOpenerSpeaksFirst(e.target.checked)}
+              />
+              <span className="toggle-track"></span>
+            </label>
+          </div>
+        </div>
+
+        {/* Main Script */}
+        <div className="card">
+          <div className="card-header">
+            <div className="card-title">{t.mainScript}</div>
+          </div>
+          <p style={{ ...fieldDesc, marginBottom: "16px" }}>{t.mainScriptDesc}</p>
+          <textarea
+            className="prompt-textarea"
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+          />
+          <div className="textarea-footer">
+            <span className="char-count">
+              {prompt.length.toLocaleString()} {t.characters}
+            </span>
+            {autoSaveLabel}
+          </div>
+        </div>
+
         {/* Business Hours */}
         <div className="card">
           <div className="card-header">
@@ -320,17 +392,7 @@ export function SettingsClient({
               {t.easternTime}
             </span>
           </div>
-          <p
-            style={{
-              fontSize: "0.78rem",
-              color: "var(--text-secondary)",
-              fontWeight: 300,
-              marginBottom: "20px",
-              lineHeight: 1.6,
-            }}
-          >
-            {t.businessHoursDesc}
-          </p>
+          <p style={{ ...fieldDesc, marginBottom: "20px" }}>{t.businessHoursDesc}</p>
 
           <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
             {[
@@ -438,22 +500,106 @@ export function SettingsClient({
           </div>
         </div>
 
+        {/* Silence Detection */}
+        <div className="card">
+          <div className="card-header">
+            <div className="card-title">{t.silenceDetection}</div>
+          </div>
+          <p style={{ ...fieldDesc, marginBottom: "20px" }}>{t.silenceDetectionDesc}</p>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+                <span style={{ fontSize: "0.78rem", fontWeight: 500 }}>{t.firstCheckIn}</span>
+                <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>—</span>
+                <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>{t.after}</span>
+                <input
+                  type="number"
+                  value={inactivity1Seconds}
+                  onChange={(e) => setInactivity1Seconds(Number(e.target.value))}
+                  min={3}
+                  max={30}
+                  className="cred-input"
+                  style={{ width: "60px", padding: "4px 8px", fontSize: "0.78rem", textAlign: "center" }}
+                />
+                <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>{t.secondsOfSilence}</span>
+              </div>
+              <input
+                type="text"
+                className="cred-input"
+                value={inactivity1Message}
+                onChange={(e) => setInactivity1Message(e.target.value)}
+                style={{ width: "100%", fontSize: "0.85rem" }}
+              />
+            </div>
+
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+                <span style={{ fontSize: "0.78rem", fontWeight: 500 }}>{t.finalWarning}</span>
+                <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>—</span>
+                <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>{t.after}</span>
+                <input
+                  type="number"
+                  value={inactivity2Seconds}
+                  onChange={(e) => setInactivity2Seconds(Number(e.target.value))}
+                  min={3}
+                  max={30}
+                  className="cred-input"
+                  style={{ width: "60px", padding: "4px 8px", fontSize: "0.78rem", textAlign: "center" }}
+                />
+                <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>{t.moreSeconds}</span>
+              </div>
+              <input
+                type="text"
+                className="cred-input"
+                value={inactivity2Message}
+                onChange={(e) => setInactivity2Message(e.target.value)}
+                style={{ width: "100%", fontSize: "0.85rem" }}
+              />
+              <span style={{ fontSize: "0.68rem", color: "var(--text-muted)", marginTop: "4px", display: "block" }}>
+                {t.hangUpAfterThis}
+              </span>
+            </div>
+
+            <div style={{ borderTop: "1px solid var(--border)", paddingTop: "16px" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
+                <div>
+                  <span style={{ fontSize: "0.78rem", fontWeight: 500 }}>{t.noiseSensitivity}</span>
+                  <span style={{ fontSize: "0.68rem", color: "var(--text-muted)", marginLeft: "8px" }}>
+                    {vadSensitivity.toFixed(2)}
+                  </span>
+                </div>
+                <div style={{ fontSize: "0.68rem", color: "var(--text-muted)", display: "flex", gap: "12px" }}>
+                  <span>{t.moreNoise}</span>
+                  <span>{t.lessNoise}</span>
+                </div>
+              </div>
+              <input
+                type="range"
+                min="0.1"
+                max="0.5"
+                step="0.05"
+                value={vadSensitivity}
+                onChange={(e) => setVadSensitivity(Number(e.target.value))}
+                style={{ width: "100%", accentColor: "var(--whiskey)" }}
+              />
+            </div>
+          </div>
+        </div>
+      </Section>
+
+      {/* ─────────────── SECTION 2: LIVE TRANSFER ─────────────── */}
+      <Section
+        title={t.liveTransfer}
+        subtitle={t.liveTransferDesc}
+        defaultOpen={false}
+      >
         {/* Closer Numbers */}
         <div className="card">
           <div className="card-header">
             <div className="card-title">{t.closerNumbers}</div>
           </div>
-          <p
-            style={{
-              fontSize: "0.78rem",
-              color: "var(--text-secondary)",
-              fontWeight: 300,
-              marginBottom: "20px",
-              lineHeight: 1.6,
-            }}
-          >
-            {t.closerNumbersDesc}
-          </p>
+          <p style={{ ...fieldDesc, marginBottom: "20px" }}>{t.closerNumbersDesc}</p>
 
           <div className="closer-list">
             {closers.map((c, i) => (
@@ -488,198 +634,12 @@ export function SettingsClient({
           </div>
         </div>
 
-        {/* Silence Detection */}
-        <div className="card">
-          <div className="card-header">
-            <div className="card-title">{t.silenceDetection}</div>
-          </div>
-          <p
-            style={{
-              fontSize: "0.78rem",
-              color: "var(--text-secondary)",
-              fontWeight: 300,
-              marginBottom: "20px",
-              lineHeight: 1.6,
-            }}
-          >
-            {t.silenceDetectionDesc}
-          </p>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-            {/* First check-in */}
-            <div>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-                <span style={{ fontSize: "0.78rem", fontWeight: 500 }}>{t.firstCheckIn}</span>
-                <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>—</span>
-                <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>{t.after}</span>
-                <input
-                  type="number"
-                  value={inactivity1Seconds}
-                  onChange={(e) => setInactivity1Seconds(Number(e.target.value))}
-                  min={3}
-                  max={30}
-                  className="cred-input"
-                  style={{ width: "60px", padding: "4px 8px", fontSize: "0.78rem", textAlign: "center" }}
-                />
-                <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>{t.secondsOfSilence}</span>
-              </div>
-              <input
-                type="text"
-                className="cred-input"
-                value={inactivity1Message}
-                onChange={(e) => setInactivity1Message(e.target.value)}
-                style={{ width: "100%", fontSize: "0.85rem" }}
-              />
-            </div>
-
-            {/* Second check-in + hangup */}
-            <div>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-                <span style={{ fontSize: "0.78rem", fontWeight: 500 }}>{t.finalWarning}</span>
-                <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>—</span>
-                <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>{t.after}</span>
-                <input
-                  type="number"
-                  value={inactivity2Seconds}
-                  onChange={(e) => setInactivity2Seconds(Number(e.target.value))}
-                  min={3}
-                  max={30}
-                  className="cred-input"
-                  style={{ width: "60px", padding: "4px 8px", fontSize: "0.78rem", textAlign: "center" }}
-                />
-                <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>{t.moreSeconds}</span>
-              </div>
-              <input
-                type="text"
-                className="cred-input"
-                value={inactivity2Message}
-                onChange={(e) => setInactivity2Message(e.target.value)}
-                style={{ width: "100%", fontSize: "0.85rem" }}
-              />
-              <span style={{ fontSize: "0.68rem", color: "var(--text-muted)", marginTop: "4px", display: "block" }}>
-                {t.hangUpAfterThis}
-              </span>
-            </div>
-
-            {/* VAD sensitivity */}
-            <div style={{ borderTop: "1px solid var(--border)", paddingTop: "16px" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
-                <div>
-                  <span style={{ fontSize: "0.78rem", fontWeight: 500 }}>{t.noiseSensitivity}</span>
-                  <span style={{ fontSize: "0.68rem", color: "var(--text-muted)", marginLeft: "8px" }}>
-                    {vadSensitivity.toFixed(2)}
-                  </span>
-                </div>
-                <div style={{ fontSize: "0.68rem", color: "var(--text-muted)", display: "flex", gap: "12px" }}>
-                  <span>{t.moreNoise}</span>
-                  <span>{t.lessNoise}</span>
-                </div>
-              </div>
-              <input
-                type="range"
-                min="0.1"
-                max="0.5"
-                step="0.05"
-                value={vadSensitivity}
-                onChange={(e) => setVadSensitivity(Number(e.target.value))}
-                style={{ width: "100%", accentColor: "var(--whiskey)" }}
-              />
-            </div>
-          </div>
-        </div>
-      </Section>
-
-      {/* ─────────────── SECTION 2: AI SCRIPTS ─────────────── */}
-      <Section
-        title={t.aiScripts}
-        subtitle={t.aiScriptsDesc}
-        defaultOpen={true}
-      >
-        {/* Opener */}
-        <div className="card">
-          <div className="card-header">
-            <div className="card-title">{t.opener}</div>
-          </div>
-          <p
-            style={{
-              fontSize: "0.78rem",
-              color: "var(--text-secondary)",
-              fontWeight: 300,
-              marginBottom: "16px",
-              lineHeight: 1.6,
-            }}
-          >
-            {t.openerDesc}
-          </p>
-          <input
-            type="text"
-            className="cred-input"
-            value={opener}
-            onChange={(e) => setOpener(e.target.value)}
-            placeholder="Hi, thanks for calling Nova Structa. Who am I speaking with?"
-            style={{ width: "100%", fontSize: "0.95rem" }}
-          />
-          <div className="toggle-row" style={{ marginTop: "20px" }}>
-            <div className="toggle-label">
-              <strong>{t.aiSpeaksFirst}</strong>
-              <span>{t.aiSpeaksFirstDesc}</span>
-            </div>
-            <label className="toggle-switch">
-              <input
-                type="checkbox"
-                checked={openerSpeaksFirst}
-                onChange={(e) => setOpenerSpeaksFirst(e.target.checked)}
-              />
-              <span className="toggle-track"></span>
-            </label>
-          </div>
-        </div>
-
-        {/* AI System Prompt */}
-        <div className="card">
-          <div className="card-header">
-            <div className="card-title">{t.mainScript}</div>
-          </div>
-          <p
-            style={{
-              fontSize: "0.78rem",
-              color: "var(--text-secondary)",
-              fontWeight: 300,
-              marginBottom: "16px",
-              lineHeight: 1.6,
-            }}
-          >
-            {t.mainScriptDesc}
-          </p>
-          <textarea
-            className="prompt-textarea"
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-          />
-          <div className="textarea-footer">
-            <span className="char-count">
-              {prompt.length.toLocaleString()} {t.characters}
-            </span>
-            {autoSaveLabel}
-          </div>
-        </div>
-
         {/* Scenario A Script */}
         <div className="card">
           <div className="card-header">
             <div className="card-title">{t.scenarioATitle}</div>
           </div>
-          <p
-            style={{
-              fontSize: "0.78rem",
-              color: "var(--text-secondary)",
-              fontWeight: 300,
-              marginBottom: "16px",
-              lineHeight: 1.6,
-            }}
-          >
-            {t.scenarioADesc}
-          </p>
+          <p style={{ ...fieldDesc, marginBottom: "16px" }}>{t.scenarioADesc}</p>
           <textarea
             className="prompt-textarea"
             value={scenarioAScript}
@@ -694,22 +654,143 @@ export function SettingsClient({
           </div>
         </div>
 
-        {/* Scenario B Script */}
+        {/* Transfer Phrases */}
+        <div className="card">
+          <div className="card-header">
+            <div className="card-title">{t.connectingMsg}</div>
+          </div>
+          <p style={fieldDesc}>{t.connectingMsgDesc}</p>
+          <input
+            type="text"
+            className="cred-input"
+            value={transferConnectingMsg}
+            onChange={(e) => setTransferConnectingMsg(e.target.value)}
+            style={{ width: "100%", fontSize: "0.9rem" }}
+          />
+        </div>
+
+        <div className="card">
+          <div className="card-header">
+            <div className="card-title">{t.retryMsg}</div>
+          </div>
+          <p style={fieldDesc}>{t.retryMsgDesc}</p>
+          <input
+            type="text"
+            className="cred-input"
+            value={transferRetryMsg}
+            onChange={(e) => setTransferRetryMsg(e.target.value)}
+            style={{ width: "100%", fontSize: "0.9rem" }}
+          />
+        </div>
+
+        <div className="card">
+          <div className="card-header">
+            <div className="card-title">{t.scenarioAOpener}</div>
+          </div>
+          <p style={fieldDesc}>{t.scenarioAOpenerDesc}</p>
+          <input
+            type="text"
+            className="cred-input"
+            value={scenarioAOpener}
+            onChange={(e) => setScenarioAOpener(e.target.value)}
+            style={{ width: "100%", fontSize: "0.9rem" }}
+          />
+        </div>
+
+        <div className="card">
+          <div className="card-header">
+            <div className="card-title">{t.errorFallback}</div>
+          </div>
+          <p style={fieldDesc}>{t.errorFallbackDesc}</p>
+          <input
+            type="text"
+            className="cred-input"
+            value={transferErrorMsg}
+            onChange={(e) => setTransferErrorMsg(e.target.value)}
+            style={{ width: "100%", fontSize: "0.9rem" }}
+          />
+        </div>
+      </Section>
+
+      {/* ─────────────── SECTION 3: APPOINTMENT BOOKING ─────────────── */}
+      <Section
+        title={t.appointmentBooking}
+        subtitle={t.appointmentBookingDesc}
+        defaultOpen={false}
+      >
+        <div className="card">
+          <div className="card-header">
+            <div className="card-title">{t.bookingIntroMsg}</div>
+          </div>
+          <p style={fieldDesc}>{t.bookingIntroMsgDesc}</p>
+          <input
+            type="text"
+            className="cred-input"
+            value={bookingIntroMsg}
+            onChange={(e) => setBookingIntroMsg(e.target.value)}
+            style={{ width: "100%", fontSize: "0.9rem" }}
+          />
+        </div>
+
+        <div className="card">
+          <div className="card-header">
+            <div className="card-title">{t.bookingConfirmMsg}</div>
+          </div>
+          <p style={fieldDesc}>{t.bookingConfirmMsgDesc}</p>
+          <input
+            type="text"
+            className="cred-input"
+            value={bookingConfirmMsg}
+            onChange={(e) => setBookingConfirmMsg(e.target.value)}
+            style={{ width: "100%", fontSize: "0.9rem" }}
+          />
+        </div>
+
+        <div className="card">
+          <div className="card-header">
+            <div className="card-title">{t.bookingFailMsg}</div>
+          </div>
+          <p style={fieldDesc}>{t.bookingFailMsgDesc}</p>
+          <input
+            type="text"
+            className="cred-input"
+            value={bookingFailMsg}
+            onChange={(e) => setBookingFailMsg(e.target.value)}
+            style={{ width: "100%", fontSize: "0.9rem" }}
+          />
+        </div>
+
+        <div className="card">
+          <div className="card-header">
+            <div className="card-title">{t.bookingMinHoursAhead}</div>
+          </div>
+          <p style={fieldDesc}>{t.bookingMinHoursAheadDesc}</p>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <input
+              type="number"
+              className="cred-input"
+              value={bookingMinHoursAhead}
+              onChange={(e) => setBookingMinHoursAhead(Number(e.target.value))}
+              min={0}
+              max={48}
+              style={{ width: "80px", padding: "6px 10px", fontSize: "0.9rem", textAlign: "center" }}
+            />
+            <span style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>hours from now</span>
+          </div>
+        </div>
+      </Section>
+
+      {/* ─────────────── SECTION 4: AFTER HOURS ─────────────── */}
+      <Section
+        title={t.afterHoursSection}
+        subtitle={t.afterHoursSectionDesc}
+        defaultOpen={false}
+      >
         <div className="card">
           <div className="card-header">
             <div className="card-title">{t.scenarioBTitle}</div>
           </div>
-          <p
-            style={{
-              fontSize: "0.78rem",
-              color: "var(--text-secondary)",
-              fontWeight: 300,
-              marginBottom: "16px",
-              lineHeight: 1.6,
-            }}
-          >
-            {t.scenarioBDesc}
-          </p>
+          <p style={{ ...fieldDesc, marginBottom: "16px" }}>{t.scenarioBDesc}</p>
           <textarea
             className="prompt-textarea"
             value={scenarioBScript}
@@ -725,113 +806,10 @@ export function SettingsClient({
         </div>
       </Section>
 
-      {/* ─────────────── SECTION 3: TRANSFER PHRASES ─────────────── */}
+      {/* ─────────────── SECTION 5: INTEGRATIONS ─────────────── */}
       <Section
-        title={t.transferPhrases}
-        subtitle={t.transferPhrasesDesc}
-        defaultOpen={false}
-      >
-        <div className="card">
-          <div className="card-header">
-            <div className="card-title">{t.connectingMsg}</div>
-          </div>
-          <p
-            style={{
-              fontSize: "0.78rem",
-              color: "var(--text-secondary)",
-              fontWeight: 300,
-              marginBottom: "12px",
-              lineHeight: 1.6,
-            }}
-          >
-            {t.connectingMsgDesc}
-          </p>
-          <input
-            type="text"
-            className="cred-input"
-            value={transferConnectingMsg}
-            onChange={(e) => setTransferConnectingMsg(e.target.value)}
-            style={{ width: "100%", fontSize: "0.9rem" }}
-          />
-        </div>
-
-        <div className="card">
-          <div className="card-header">
-            <div className="card-title">{t.retryMsg}</div>
-          </div>
-          <p
-            style={{
-              fontSize: "0.78rem",
-              color: "var(--text-secondary)",
-              fontWeight: 300,
-              marginBottom: "12px",
-              lineHeight: 1.6,
-            }}
-          >
-            {t.retryMsgDesc}
-          </p>
-          <input
-            type="text"
-            className="cred-input"
-            value={transferRetryMsg}
-            onChange={(e) => setTransferRetryMsg(e.target.value)}
-            style={{ width: "100%", fontSize: "0.9rem" }}
-          />
-        </div>
-
-        <div className="card">
-          <div className="card-header">
-            <div className="card-title">{t.scenarioAOpener}</div>
-          </div>
-          <p
-            style={{
-              fontSize: "0.78rem",
-              color: "var(--text-secondary)",
-              fontWeight: 300,
-              marginBottom: "12px",
-              lineHeight: 1.6,
-            }}
-          >
-            {t.scenarioAOpenerDesc}
-          </p>
-          <input
-            type="text"
-            className="cred-input"
-            value={scenarioAOpener}
-            onChange={(e) => setScenarioAOpener(e.target.value)}
-            style={{ width: "100%", fontSize: "0.9rem" }}
-          />
-        </div>
-
-        <div className="card">
-          <div className="card-header">
-            <div className="card-title">{t.errorFallback}</div>
-          </div>
-          <p
-            style={{
-              fontSize: "0.78rem",
-              color: "var(--text-secondary)",
-              fontWeight: 300,
-              marginBottom: "12px",
-              lineHeight: 1.6,
-            }}
-          >
-            {t.errorFallbackDesc}
-          </p>
-          <input
-            type="text"
-            className="cred-input"
-            value={transferErrorMsg}
-            onChange={(e) => setTransferErrorMsg(e.target.value)}
-            style={{ width: "100%", fontSize: "0.9rem" }}
-          />
-        </div>
-      </Section>
-
-      {/* ─────────────── SECTION 4: CREDENTIALS ─────────────── */}
-      <Section
-        title={t.credentials}
-        subtitle={t.credentialsDesc}
+        title={t.integrations}
+        subtitle={t.integrationsDesc}
         defaultOpen={false}
       >
         <div className="card">

@@ -259,26 +259,35 @@ export async function POST(req: NextRequest) {
     const scenarioBScript = channel?.scenario_b_script || settings.scenario_b_script ||
       "Great news — you do qualify for the program. Our advisors are off for the evening, but I don't want you to lose your spot. I'm locking in your information right now, and first thing tomorrow morning one of our advisors will give you a personal call. What time works best for you — earlier in the morning or later in the afternoon?";
 
+    // Booking phrases from settings
+    const bookingIntroMsg = settings.booking_intro_msg || "Great news — you qualify for our program! Let me check what appointment times we have available for you.";
+    const bookingConfirmMsg = settings.booking_confirm_msg || "You're all set! You'll get a confirmation shortly. One of our advisors will speak with you at that time.";
+    const bookingFailMsg = settings.booking_fail_msg || "Let me have someone confirm your time manually — we'll reach out shortly to lock it in.";
+
     if (duringBusinessHours) {
       if (closeMode === "booking" && channelCalendarId) {
         // ── BOOKING MODE ──
         const directive = `THIS IS DURING BUSINESS HOURS — APPOINTMENT BOOKING MODE.
 
 THE CLOSE — BOOK AN APPOINTMENT
-Once all four gates are confirmed, say something like: "Great news — you qualify for our program! Let me check what appointment times we have available for you." Then call the checkAvailability tool immediately.
+Once all four gates are confirmed, say naturally: "${bookingIntroMsg}"
 
-After you get available times back, present 2-3 options naturally. Let them pick one. Once they choose, call the bookAppointment tool with their selected time slot.
+Then IMMEDIATELY ask: "Would today or tomorrow work better for you?" Wait for their answer.
+Then ask: "Morning or afternoon?" Wait for their answer.
+Then call the checkAvailability tool to get the 2 best matching slots.
 
-After booking confirms, tell them: "You're all set! You'll get a confirmation shortly. One of our advisors will speak with you at that time." Do NOT ask for their address.
+When you get the times back, present both options naturally — e.g. "I have Tuesday at 10 AM or Tuesday at 2 PM — which one works?" Let them pick. Once they choose, call the bookAppointment tool with their selected time slot.
+
+After booking confirms, say naturally: "${bookingConfirmMsg}" Do NOT ask for their address.
 
 IF BOOKING FAILS:
-Let them know we'll confirm their time manually and someone will reach out to confirm. Then wrap up warmly.
+Say naturally: "${bookingFailMsg}" Then wrap up warmly.
 
 ENDING CALLS: Never hang up abruptly. After booking completes, always ask "Is there anything else before I let you go?" and wait for their response. Only use hangUp after they say goodbye or confirm they're good.
 ——————————————————————————\n\n`;
 
         systemPrompt = directive + systemPrompt + `\n\n——————————————————————————
-REMINDER: Use checkAvailability first, then bookAppointment with the lead's chosen slot. Never hang up without saying goodbye and giving them a chance to respond.`;
+REMINDER: Ask today/tomorrow, then morning/afternoon, then call checkAvailability. Present the 2 options. Use bookAppointment with the lead's chosen slot. Never hang up without saying goodbye.`;
       } else {
         // ── TRANSFER MODE ──
         const closerNames = closers

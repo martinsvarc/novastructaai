@@ -22,6 +22,12 @@ export async function runMigrations() {
     await sql`ALTER TABLE channels ADD COLUMN IF NOT EXISTS close_mode TEXT DEFAULT 'transfer'`;
     await sql`ALTER TABLE channels ADD COLUMN IF NOT EXISTS ghl_calendar_id TEXT DEFAULT ''`;
 
+    // Booking settings
+    await sql`ALTER TABLE settings ADD COLUMN IF NOT EXISTS booking_intro_msg TEXT DEFAULT 'Great news — you qualify for our program! Let me check what appointment times we have available for you.'`;
+    await sql`ALTER TABLE settings ADD COLUMN IF NOT EXISTS booking_confirm_msg TEXT DEFAULT 'You''re all set! You''ll get a confirmation shortly. One of our advisors will speak with you at that time.'`;
+    await sql`ALTER TABLE settings ADD COLUMN IF NOT EXISTS booking_fail_msg TEXT DEFAULT 'Let me have someone confirm your time manually — we''ll reach out shortly to lock it in.'`;
+    await sql`ALTER TABLE settings ADD COLUMN IF NOT EXISTS booking_min_hours_ahead INTEGER DEFAULT 3`;
+
     console.log("DB migrations complete");
   } catch (err) {
     console.error("Migration error:", err);

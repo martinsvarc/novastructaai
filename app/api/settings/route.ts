@@ -26,6 +26,10 @@ export async function GET() {
     ultravox_agent_id: s.ultravox_agent_id,
     ultravox_voice_id: s.ultravox_voice_id,
     ghl_calendar_id: s.ghl_calendar_id,
+    booking_intro_msg: s.booking_intro_msg || "Great news — you qualify for our program! Let me check what appointment times we have available for you.",
+    booking_confirm_msg: s.booking_confirm_msg || "You're all set! You'll get a confirmation shortly. One of our advisors will speak with you at that time.",
+    booking_fail_msg: s.booking_fail_msg || "Let me have someone confirm your time manually — we'll reach out shortly to lock it in.",
+    booking_min_hours_ahead: s.booking_min_hours_ahead ?? 3,
     scenario_a_script: s.scenario_a_script || "",
     scenario_b_script: s.scenario_b_script || "",
     transfer_connecting_msg: s.transfer_connecting_msg || "Connecting you now.",
@@ -122,6 +126,14 @@ export async function PATCH(req: NextRequest) {
     "inactivity_2_message" in body ? body.inactivity_2_message : (row.inactivity_2_message || "I'm having a little trouble hearing you... are you there?");
   const newVadSensitivity =
     "vad_sensitivity" in body ? Number(body.vad_sensitivity) : (row.vad_sensitivity ?? 0.15);
+  const newBookingIntroMsg =
+    "booking_intro_msg" in body ? body.booking_intro_msg : (row.booking_intro_msg || "Great news — you qualify for our program! Let me check what appointment times we have available for you.");
+  const newBookingConfirmMsg =
+    "booking_confirm_msg" in body ? body.booking_confirm_msg : (row.booking_confirm_msg || "You're all set! You'll get a confirmation shortly. One of our advisors will speak with you at that time.");
+  const newBookingFailMsg =
+    "booking_fail_msg" in body ? body.booking_fail_msg : (row.booking_fail_msg || "Let me have someone confirm your time manually — we'll reach out shortly to lock it in.");
+  const newBookingMinHoursAhead =
+    "booking_min_hours_ahead" in body ? Number(body.booking_min_hours_ahead) : (row.booking_min_hours_ahead ?? 3);
 
   await sql`
     UPDATE settings SET
@@ -147,6 +159,10 @@ export async function PATCH(req: NextRequest) {
       inactivity_2_seconds = ${newInactivity2Seconds},
       inactivity_2_message = ${newInactivity2Message},
       vad_sensitivity = ${newVadSensitivity},
+      booking_intro_msg = ${newBookingIntroMsg},
+      booking_confirm_msg = ${newBookingConfirmMsg},
+      booking_fail_msg = ${newBookingFailMsg},
+      booking_min_hours_ahead = ${newBookingMinHoursAhead},
       updated_at = NOW()
     WHERE id = 1
   `;

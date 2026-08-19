@@ -30,6 +30,10 @@ const DEFAULTS = {
   inactivity_2_seconds: 10,
   inactivity_2_message: "I'm having a little trouble hearing you... are you there?",
   vad_sensitivity: 0.15,
+  booking_intro_msg: "Great news — you qualify for our program! Let me check what appointment times we have available for you.",
+  booking_confirm_msg: "You're all set! You'll get a confirmation shortly. One of our advisors will speak with you at that time.",
+  booking_fail_msg: "Let me have someone confirm your time manually — we'll reach out shortly to lock it in.",
+  booking_min_hours_ahead: 3,
   business_hours: {
     monday: { enabled: true, open: "09:00", close: "18:00" },
     tuesday: { enabled: true, open: "09:00", close: "18:00" },
@@ -75,6 +79,10 @@ export default function SettingsPage() {
           inactivity_2_message: data.inactivity_2_message || DEFAULTS.inactivity_2_message,
           vad_sensitivity: data.vad_sensitivity ?? 0.15,
           business_hours: data.business_hours || DEFAULTS.business_hours,
+          booking_intro_msg: data.booking_intro_msg || DEFAULTS.booking_intro_msg,
+          booking_confirm_msg: data.booking_confirm_msg || DEFAULTS.booking_confirm_msg,
+          booking_fail_msg: data.booking_fail_msg || DEFAULTS.booking_fail_msg,
+          booking_min_hours_ahead: data.booking_min_hours_ahead ?? DEFAULTS.booking_min_hours_ahead,
         });
       })
       .catch(() => setError(true));
