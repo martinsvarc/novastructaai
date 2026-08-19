@@ -270,11 +270,13 @@ export async function POST(req: NextRequest) {
         const directive = `THIS IS DURING BUSINESS HOURS — APPOINTMENT BOOKING MODE.
 
 THE CLOSE — BOOK AN APPOINTMENT
-Once all four gates are confirmed, say naturally: "${bookingIntroMsg}" Then call checkAvailability IMMEDIATELY — do NOT ask what day or time they prefer first. The system already knows what times are available and will give you the 2 soonest options.
+Once the lead is fully qualified and you've captured their property details, decision makers, address, and name — say naturally: "${bookingIntroMsg}"
 
-Present both options naturally. For example: "I have today at 6 PM or tomorrow at 10 AM — which one works better for you?" Let them pick. Once they choose, call the bookAppointment tool with their selected time slot.
+Then IMMEDIATELY call checkAvailability. Don't ask what day or time they prefer — the system already knows what's available and gives you the 2 soonest options.
 
-After booking confirms, say naturally: "${bookingConfirmMsg}" Do NOT ask for their address.
+Present both options naturally: "I have today at 6 PM or tomorrow at 10 AM... which one works better for you?" Let them pick. Once they choose, call bookAppointment with their selected time slot.
+
+After booking confirms, say naturally: "${bookingConfirmMsg}"
 
 IF BOOKING FAILS:
 Say naturally: "${bookingFailMsg}" Then wrap up warmly.
@@ -283,7 +285,7 @@ ENDING CALLS: Never hang up abruptly. After booking completes, always ask "Is th
 ——————————————————————————\n\n`;
 
         systemPrompt = directive + systemPrompt + `\n\n——————————————————————————
-REMINDER: Call checkAvailability right after qualifying — do NOT ask about day/time preferences first. Present the 2 options the tool gives you. Use bookAppointment with the lead's chosen slot. Never hang up without saying goodbye.`;
+REMINDER: Qualify all gates, capture property details + address + decision makers, THEN call checkAvailability. Present the 2 options. Use bookAppointment with their chosen slot. Never hang up without saying goodbye.`;
       } else {
         // ── TRANSFER MODE ──
         const closerNames = closers
@@ -291,10 +293,10 @@ REMINDER: Call checkAvailability right after qualifying — do NOT ask about day
           .map((c) => c.name)
           .join(", ");
 
-        const directive = `THIS IS DURING BUSINESS HOURS.
+        const directive = `THIS IS DURING BUSINESS HOURS — LIVE TRANSFER MODE.
 
 THE CLOSE — LIVE TRANSFER
-Once all four gates are confirmed, say something like: "Great, you qualify for our program... please hold while I find an available advisor for you. Okay, I found one — I'm transferring you now." Then call the transferCall tool immediately. Do NOT ask for their address. Do NOT offer to schedule.
+Once the lead is fully qualified and you've captured their property details, decision makers, address, and name — say something like: "Great, you qualify for our program... please hold while I find an available advisor for you." Then call transferCall immediately.
 ${closerNames ? `Available consultants: ${closerNames}.` : ""}
 
 IF TRANSFER FAILS (you'll get an error response from transferCall):
@@ -304,7 +306,7 @@ ENDING CALLS: Never hang up abruptly. After any scenario completes, always ask "
 ——————————————————————————\n\n`;
 
         systemPrompt = directive + systemPrompt + `\n\n——————————————————————————
-REMINDER: Use transferCall the moment the lead qualifies. If transfer fails, fall back to sendTextScenarioA. Never hang up without saying goodbye and giving them a chance to respond.`;
+REMINDER: Qualify all gates, capture property details + address + decision makers, THEN use transferCall. If transfer fails, fall back to sendTextScenarioA. Never hang up without saying goodbye.`;
       }
     } else {
       const directive = `AFTER HOURS MODE — SCENARIO B.
@@ -312,11 +314,11 @@ REMINDER: Use transferCall the moment the lead qualifies. If transfer fails, fal
 It is currently after business hours. Our advisors are not available right now.
 
 THE CLOSE — AFTER HOURS LOCK-IN
-Once all four gates are confirmed, deliver this naturally in your own words: "${scenarioBScript}"
+Once the lead is fully qualified and you've captured their property details, decision makers, address, and name — deliver this naturally in your own words: "${scenarioBScript}"
 
 After they give a preference, call the notifyScenarioB tool with their timePreference (e.g. "morning" or "afternoon"). Then confirm warmly that they're locked in.
 
-ENDING CALLS: Never hang up abruptly. Always ask "Is there anything else before I let you go?" and wait for their response. Only use hangUp after they say goodbye or confirm they're good. Do NOT attempt to transfer. Do NOT ask for their address.
+ENDING CALLS: Never hang up abruptly. Always ask "Is there anything else before I let you go?" and wait for their response. Only use hangUp after they say goodbye or confirm they're good. Do NOT attempt to transfer.
 ——————————————————————————\n\n`;
 
       systemPrompt = directive + systemPrompt;
