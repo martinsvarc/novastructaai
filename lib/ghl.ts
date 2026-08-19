@@ -1,4 +1,5 @@
 import { getDb } from "./db";
+import { runMigrations } from "./migrate";
 
 const GHL_API = "https://services.leadconnectorhq.com";
 const GHL_TOKEN_URL = "https://services.leadconnectorhq.com/oauth/token";
@@ -18,6 +19,7 @@ interface TokenData {
  * Uses a simple DB-level check to avoid race conditions.
  */
 export async function getGhlToken(): Promise<{ accessToken: string; locationId: string } | null> {
+  await runMigrations();
   const sql = getDb();
   const rows = await sql`SELECT ghl_access_token, ghl_refresh_token, ghl_token_expires_at, ghl_location_id FROM settings WHERE id = 1`;
   if (rows.length === 0) return null;

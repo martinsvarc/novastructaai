@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
+import { runMigrations } from "@/lib/migrate";
 
 export async function GET() {
   try {
+    await runMigrations();
     const sql = getDb();
 
     // Get all channels

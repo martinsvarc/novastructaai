@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
+import { runMigrations } from "@/lib/migrate";
 
 const GHL_CLIENT_ID = process.env.GHL_CLIENT_ID || "";
 const GHL_CLIENT_SECRET = process.env.GHL_CLIENT_SECRET || "";
@@ -13,6 +14,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    await runMigrations();
     const redirectUri = `${APP_URL}/api/crm/callback`;
 
     const res = await fetch("https://services.leadconnectorhq.com/oauth/token", {

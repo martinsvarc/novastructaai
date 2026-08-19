@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
+import { runMigrations } from "@/lib/migrate";
 
 export async function GET() {
   try {
+    await runMigrations();
     const sql = getDb();
     const rows = await sql`SELECT ghl_access_token, ghl_location_id, ghl_token_expires_at FROM settings WHERE id = 1`;
     if (rows.length === 0) return NextResponse.json({ connected: false });
