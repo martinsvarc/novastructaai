@@ -928,24 +928,25 @@ export function SettingsClient({
               }}>
                 Connect your GoHighLevel account to enable appointment booking directly from AI calls.
               </p>
-              <a
-                href="/api/crm/authorize"
-                className="btn"
+              <button
+                onClick={() => { window.location.href = "/api/crm/authorize"; }}
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
                   gap: 8,
-                  background: "var(--whiskey)",
+                  background: "#f3880e",
                   color: "#fff",
                   padding: "10px 20px",
                   borderRadius: 8,
-                  textDecoration: "none",
+                  border: "none",
+                  cursor: "pointer",
                   fontSize: "0.85rem",
                   fontWeight: 500,
+                  fontFamily: "var(--sans)",
                 }}
               >
                 Connect GoHighLevel
-              </a>
+              </button>
             </div>
           )}
         </div>
