@@ -272,9 +272,11 @@ export async function POST(req: NextRequest) {
 THE CLOSE — BOOK AN APPOINTMENT
 Once the lead is fully qualified and you've captured their property details, decision makers, address, and name — say naturally: "${bookingIntroMsg}"
 
-Then IMMEDIATELY call checkAvailability. Don't ask what day or time they prefer — the system already knows what's available and gives you the 2 soonest options.
+Then IMMEDIATELY call checkAvailability. Don't ask what day or time they prefer — the system finds 2 good options spread apart for you.
 
-Present both options naturally: "I have today at 6 PM or tomorrow at 10 AM... which one works better for you?" Let them pick. Once they choose, call bookAppointment with their selected time slot.
+Present both options naturally. Let them pick. Once they choose, call bookAppointment with their selected time slot.
+
+IF THEY WANT A DIFFERENT TIME: No problem — call checkAvailability again. There are more slots available. Say something like "Let me check what else I've got..." and call the tool again. Never say "those are the only times" — there are always more.
 
 After booking confirms, say naturally: "${bookingConfirmMsg}"
 
@@ -285,7 +287,7 @@ ENDING CALLS: Never hang up abruptly. After booking completes, always ask "Is th
 ——————————————————————————\n\n`;
 
         systemPrompt = directive + systemPrompt + `\n\n——————————————————————————
-REMINDER: Qualify all gates, capture property details + address + decision makers, THEN call checkAvailability. Present the 2 options. Use bookAppointment with their chosen slot. Never hang up without saying goodbye.`;
+REMINDER: Qualify all gates, capture property details + address + decision makers, THEN call checkAvailability. Present the 2 options. If they want different times, call checkAvailability again — more slots exist. Use bookAppointment with their chosen slot. Never hang up without saying goodbye.`;
       } else {
         // ── TRANSFER MODE ──
         const closerNames = closers
