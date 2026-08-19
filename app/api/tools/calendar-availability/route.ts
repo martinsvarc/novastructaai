@@ -50,8 +50,8 @@ export async function POST(req: NextRequest) {
     const minHoursAhead = settingsRows.length > 0 ? (settingsRows[0].booking_min_hours_ahead ?? 3) : 3;
 
     const tz = timezone || "America/New_York";
-    // Fetch 2 days of slots (today + tomorrow)
-    const data = await getGhlFreeSlots(calendarId, tz, 2);
+    // Fetch 3 days of slots (today + tomorrow + day after)
+    const data = await getGhlFreeSlots(calendarId, tz, 3);
 
     const earliestAllowed = Date.now() + minHoursAhead * 60 * 60 * 1000;
 
