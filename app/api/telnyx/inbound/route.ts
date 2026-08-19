@@ -382,7 +382,7 @@ ENDING CALLS: Never hang up abruptly. Always ask "Is there anything else before 
           temporaryTool: {
             modelToolName: "checkAvailability",
             description:
-              "Check available appointment times. Call this when the lead is qualified and ready to book.",
+              "Check available appointment times. Call this when the lead is qualified and ready to book. You can call this MULTIPLE TIMES — if the lead wants a different day or time, call it again with preferredDay set to what they asked for.",
             dynamicParameters: [
               {
                 name: "timezone",
@@ -390,6 +390,24 @@ ENDING CALLS: Never hang up abruptly. Always ask "Is there anything else before 
                 schema: {
                   type: "string",
                   description: "The lead's timezone, e.g. 'America/New_York'. Default to Eastern if unknown.",
+                },
+                required: false,
+              },
+              {
+                name: "preferredDay",
+                location: "PARAMETER_LOCATION_BODY",
+                schema: {
+                  type: "string",
+                  description: "Filter to a specific day. Use 'today', 'tomorrow', or a weekday name like 'Wednesday'. Only set this when the lead asks for a specific day.",
+                },
+                required: false,
+              },
+              {
+                name: "excludeSlots",
+                location: "PARAMETER_LOCATION_BODY",
+                schema: {
+                  type: "string",
+                  description: "Comma-separated ISO datetime strings of slots already offered, so they won't be repeated. Pass the rawSlots from the previous checkAvailability response.",
                 },
                 required: false,
               },

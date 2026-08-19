@@ -86,10 +86,43 @@ function formatSlotsForVoice(slots: string[], tz: string): string {
   return `${day1} at ${time1} or ${day2} at ${time2}`;
 }
 
+/**
+ * Resolve a preferredDay string ("today", "tomorrow", "Wednesday") to a date string (MM/DD/YYYY)
+ */
+function resolvePreferredDay(preferredDay: string, tz: string): string | null {
+  const now = new Date();
+  const lower = preferredDay.toLowerCase().trim();
+
+  if (lower === "today") {
+    return now.toLocaleDateString("en-US", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" });
+  }
+  if (lower === "tomorrow") {
+    const tom = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    return tom.toLocaleDateString("en-US", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" });
+  }
+
+  // Try matching a weekday name
+  const weekdays = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+  const targetIdx = weekdays.indexOf(lower);
+  if (targetIdx === -1) return null;
+
+  const currentDay = parseInt(now.toLocaleDateString("en-US", { timeZone: tz, weekday: "narrow" }).charAt(0)) || now.getDay();
+  // Actually get proper current day index
+  const nowDayName = now.toLocaleDateString("en-US", { timeZone: tz, weekday: "long" }).toLowerCase();
+  const currentIdx = weekdays.indexOf(nowDayName);
+  if (currentIdx === -1) return null;
+
+  let daysAhead = targetIdx - currentIdx;
+  if (daysAhead <= 0) daysAhead += 7;
+
+  const target = new Date(now.getTime() + daysAhead * 24 * 60 * 60 * 1000);
+  return target.toLocaleDateString("en-US", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" });
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { calendarId, timezone } = body;
+    const { calendarId, timezone, preferredDay, excludeSlots } = body;
 
     if (!calendarId) {
       return NextResponse.json({
@@ -108,14 +141,32 @@ export async function POST(req: NextRequest) {
 
     const earliestAllowed = Date.now() + minHoursAhead * 60 * 60 * 1000;
 
-    // Collect all valid slots, filtered by min hours ahead
+    // Parse excluded slots
+    const excluded = new Set<string>();
+    if (excludeSlots) {
+      for (const s of excludeSlots.split(",")) {
+        excluded.add(s.trim());
+      }
+    }
+
+    // Resolve preferred day filter
+    const preferredDayDate = preferredDay ? resolvePreferredDay(preferredDay, tz) : null;
+
+    // Collect all valid slots, filtered by min hours ahead + exclusions + day preference
     const validSlots: string[] = [];
     for (const [, dayData] of Object.entries(data)) {
       if (dayData && dayData.slots) {
         for (const slot of dayData.slots) {
-          if (new Date(slot).getTime() >= earliestAllowed) {
-            validSlots.push(slot);
+          if (new Date(slot).getTime() < earliestAllowed) continue;
+          if (excluded.has(slot)) continue;
+
+          // If preferred day set, only include slots on that day
+          if (preferredDayDate) {
+            const slotDay = new Date(slot).toLocaleDateString("en-US", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" });
+            if (slotDay !== preferredDayDate) continue;
           }
+
+          validSlots.push(slot);
         }
       }
     }
@@ -124,8 +175,9 @@ export async function POST(req: NextRequest) {
     validSlots.sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
 
     if (validSlots.length === 0) {
+      const dayNote = preferredDay ? ` for ${preferredDay}` : "";
       return NextResponse.json({
-        message: "No available times in the next few days. Ask the lead what day and time works best and we will confirm manually.",
+        message: `No available times${dayNote}. Ask the lead what other day works and call checkAvailability again with that day, or ask what time works best and we will confirm manually.`,
       });
     }
 
@@ -139,7 +191,7 @@ export async function POST(req: NextRequest) {
       message: `I have ${voiceMessage} available. Which works better for you?`,
       rawSlots: selected,
       totalAvailable: validSlots.length,
-      instruction: "If the lead wants a different time, call checkAvailability again — more slots exist beyond these two.",
+      instruction: "If the lead wants a different time or day, call checkAvailability again with preferredDay set to the day they want (e.g. 'tomorrow', 'Thursday'). Pass excludeSlots with the rawSlots above to avoid repeating the same options.",
     });
   } catch (error) {
     console.error("Calendar availability error:", error);
