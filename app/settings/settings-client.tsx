@@ -40,6 +40,11 @@ interface Settings {
   vad_sensitivity: number;
 }
 
+interface GhlStatus {
+  connected: boolean;
+  locationId?: string;
+}
+
 function showToast(msg: string) {
   const t = document.getElementById("toast");
   const m = document.getElementById("toast-msg");
@@ -176,6 +181,8 @@ export function SettingsClient({
   const [ghlCalendarId, setGhlCalendarId] = useState(
     initialSettings.ghl_calendar_id
   );
+  const [ghlStatus, setGhlStatus] = useState<GhlStatus>({ connected: false });
+  const [ghlLoading, setGhlLoading] = useState(true);
 
   function addCloser() {
     setClosers([
@@ -263,6 +270,15 @@ export function SettingsClient({
       if (saveTimer.current) clearTimeout(saveTimer.current);
     };
   }, [saveSettings]);
+
+  // Check GHL connection status on mount and after OAuth redirect
+  useEffect(() => {
+    fetch("/api/crm/status")
+      .then((res) => res.json())
+      .then((data) => setGhlStatus(data))
+      .catch(() => {})
+      .finally(() => setGhlLoading(false));
+  }, []);
 
   const autoSaveLabel = (
     <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>
@@ -864,18 +880,74 @@ export function SettingsClient({
           <div className="card-header">
             <div className="card-title">GoHighLevel</div>
           </div>
-          <div className="cred-grid">
-            <div className="cred-field">
-              <label>Calendar ID</label>
-              <input
-                className="cred-input"
-                type="text"
-                value={ghlCalendarId}
-                onChange={(e) => setGhlCalendarId(e.target.value)}
-                placeholder="Calendar ID"
-              />
+          {ghlLoading ? (
+            <div style={{ fontSize: "0.78rem", color: "var(--text-muted)", padding: "12px 0" }}>
+              Checking connection...
             </div>
-          </div>
+          ) : ghlStatus.connected ? (
+            <div>
+              <div style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "12px 16px",
+                background: "rgba(111, 192, 138, 0.08)",
+                border: "1px solid rgba(111, 192, 138, 0.25)",
+                borderRadius: 8,
+                marginBottom: 12,
+              }}>
+                <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#6FC08A", flexShrink: 0 }} />
+                <span style={{ fontSize: "0.82rem", color: "#6FC08A", fontWeight: 500 }}>Connected</span>
+                {ghlStatus.locationId && (
+                  <span style={{ fontSize: "0.72rem", color: "var(--text-muted)", marginLeft: "auto" }}>
+                    Location: {ghlStatus.locationId.slice(0, 8)}...
+                  </span>
+                )}
+              </div>
+              <button
+                className="btn btn-ghost"
+                onClick={async () => {
+                  if (!confirm("Disconnect GoHighLevel? Appointment booking will stop working.")) return;
+                  await fetch("/api/crm/status", { method: "DELETE" });
+                  setGhlStatus({ connected: false });
+                  showToast("GoHighLevel disconnected");
+                }}
+                style={{ fontSize: "0.78rem" }}
+              >
+                Disconnect
+              </button>
+            </div>
+          ) : (
+            <div>
+              <p style={{
+                fontSize: "0.78rem",
+                color: "var(--text-secondary)",
+                fontWeight: 300,
+                marginBottom: 16,
+                lineHeight: 1.6,
+              }}>
+                Connect your GoHighLevel account to enable appointment booking directly from AI calls.
+              </p>
+              <a
+                href="/api/crm/authorize"
+                className="btn"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  background: "var(--whiskey)",
+                  color: "#fff",
+                  padding: "10px 20px",
+                  borderRadius: 8,
+                  textDecoration: "none",
+                  fontSize: "0.85rem",
+                  fontWeight: 500,
+                }}
+              >
+                Connect GoHighLevel
+              </a>
+            </div>
+          )}
         </div>
       </Section>
     </div>

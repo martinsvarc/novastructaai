@@ -101,6 +101,12 @@ async function seed() {
     )
   `;
 
+  // GHL OAuth columns on settings
+  await sql`ALTER TABLE settings ADD COLUMN IF NOT EXISTS ghl_access_token TEXT DEFAULT ''`;
+  await sql`ALTER TABLE settings ADD COLUMN IF NOT EXISTS ghl_refresh_token TEXT DEFAULT ''`;
+  await sql`ALTER TABLE settings ADD COLUMN IF NOT EXISTS ghl_token_expires_at TIMESTAMPTZ`;
+  await sql`ALTER TABLE settings ADD COLUMN IF NOT EXISTS ghl_location_id TEXT DEFAULT ''`;
+
   // Add telnyx_id to channels if it doesn't exist (migration for existing deployments)
   await sql`ALTER TABLE channels ADD COLUMN IF NOT EXISTS telnyx_id TEXT DEFAULT ''`;
 
@@ -115,6 +121,10 @@ async function seed() {
   await sql`ALTER TABLE channels ADD COLUMN IF NOT EXISTS transfer_retry_msg TEXT DEFAULT ''`;
   await sql`ALTER TABLE channels ADD COLUMN IF NOT EXISTS transfer_error_msg TEXT DEFAULT ''`;
   await sql`ALTER TABLE channels ADD COLUMN IF NOT EXISTS business_hours JSONB DEFAULT '{}'::jsonb`;
+
+  // Per-channel booking mode
+  await sql`ALTER TABLE channels ADD COLUMN IF NOT EXISTS close_mode TEXT DEFAULT 'transfer'`;
+  await sql`ALTER TABLE channels ADD COLUMN IF NOT EXISTS ghl_calendar_id TEXT DEFAULT ''`;
 
   // Seed calls
   // Base: July 8, 2026 at 3:00 PM ET (19:00 UTC)

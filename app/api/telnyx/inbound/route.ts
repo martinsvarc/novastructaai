@@ -250,18 +250,43 @@ export async function POST(req: NextRequest) {
       (channelBizHours && Object.keys(channelBizHours).length ? channelBizHours : settings.business_hours) as Record<string, DayHours> | null
     );
 
+    // Per-channel close mode: "transfer" (default) or "booking"
+    const closeMode = (channel?.close_mode as string) || "transfer";
+    const channelCalendarId = (channel?.ghl_calendar_id as string) || settings.ghl_calendar_id || "";
+
     const scenarioAScript = channel?.scenario_a_script || settings.scenario_a_script ||
       "All our advisors are finishing up with other homeowners right now. I'm sending you a text right now so you stay at the front of the line. Just reply 'Hi' to confirm and an advisor will call you back within 15 minutes. Sound good?";
     const scenarioBScript = channel?.scenario_b_script || settings.scenario_b_script ||
       "Great news — you do qualify for the program. Our advisors are off for the evening, but I don't want you to lose your spot. I'm locking in your information right now, and first thing tomorrow morning one of our advisors will give you a personal call. What time works best for you — earlier in the morning or later in the afternoon?";
 
     if (duringBusinessHours) {
-      const closerNames = closers
-        .sort((a, b) => a.priority - b.priority)
-        .map((c) => c.name)
-        .join(", ");
+      if (closeMode === "booking" && channelCalendarId) {
+        // ── BOOKING MODE ──
+        const directive = `THIS IS DURING BUSINESS HOURS — APPOINTMENT BOOKING MODE.
 
-      const directive = `THIS IS DURING BUSINESS HOURS.
+THE CLOSE — BOOK AN APPOINTMENT
+Once all four gates are confirmed, say something like: "Great news — you qualify for our program! Let me check what appointment times we have available for you." Then call the checkAvailability tool immediately.
+
+After you get available times back, present 2-3 options naturally. Let them pick one. Once they choose, call the bookAppointment tool with their selected time slot.
+
+After booking confirms, tell them: "You're all set! You'll get a confirmation shortly. One of our advisors will speak with you at that time." Do NOT ask for their address.
+
+IF BOOKING FAILS:
+Let them know we'll confirm their time manually and someone will reach out to confirm. Then wrap up warmly.
+
+ENDING CALLS: Never hang up abruptly. After booking completes, always ask "Is there anything else before I let you go?" and wait for their response. Only use hangUp after they say goodbye or confirm they're good.
+——————————————————————————\n\n`;
+
+        systemPrompt = directive + systemPrompt + `\n\n——————————————————————————
+REMINDER: Use checkAvailability first, then bookAppointment with the lead's chosen slot. Never hang up without saying goodbye and giving them a chance to respond.`;
+      } else {
+        // ── TRANSFER MODE ──
+        const closerNames = closers
+          .sort((a, b) => a.priority - b.priority)
+          .map((c) => c.name)
+          .join(", ");
+
+        const directive = `THIS IS DURING BUSINESS HOURS.
 
 THE CLOSE — LIVE TRANSFER
 Once all four gates are confirmed, say something like: "Great, you qualify for our program... please hold while I find an available advisor for you. Okay, I found one — I'm transferring you now." Then call the transferCall tool immediately. Do NOT ask for their address. Do NOT offer to schedule.
@@ -273,8 +298,9 @@ Use the Scenario A approach — deliver this naturally in your own words: "${sce
 ENDING CALLS: Never hang up abruptly. After any scenario completes, always ask "Is there anything else before I let you go?" and wait for their response. Only use hangUp after they say goodbye or confirm they're good.
 ——————————————————————————\n\n`;
 
-      systemPrompt = directive + systemPrompt + `\n\n——————————————————————————
+        systemPrompt = directive + systemPrompt + `\n\n——————————————————————————
 REMINDER: Use transferCall the moment the lead qualifies. If transfer fails, fall back to sendTextScenarioA. Never hang up without saying goodbye and giving them a chance to respond.`;
+      }
     } else {
       const directive = `AFTER HOURS MODE — SCENARIO B.
 
@@ -341,44 +367,102 @@ ENDING CALLS: Never hang up abruptly. Always ask "Is there anything else before 
     ];
 
     if (duringBusinessHours) {
-      selectedTools.push({
-        temporaryTool: {
-          modelToolName: "transferCall",
-          description:
-            "Transfer this call to a live consultant. Call this tool the moment the lead is qualified.",
-          defaultReaction: "AGENT_REACTION_SPEAKS",
-          dynamicParameters: [],
-          staticParameters: [
-            { name: "callControlId", location: "PARAMETER_LOCATION_BODY", value: callSid },
-            { name: "contactId", location: "PARAMETER_LOCATION_BODY", value: contactId },
-          ],
-          automaticParameters: [
-            { name: "ultravoxCallId", location: "PARAMETER_LOCATION_BODY", knownValue: "KNOWN_PARAM_CALL_ID" },
-          ],
-          http: {
-            baseUrlPattern: `${APP_URL}/api/tools/warm-transfer`,
-            httpMethod: "POST",
+      if (closeMode === "booking" && channelCalendarId) {
+        // ── BOOKING TOOLS ──
+        selectedTools.push({
+          temporaryTool: {
+            modelToolName: "checkAvailability",
+            description:
+              "Check available appointment times. Call this when the lead is qualified and ready to book.",
+            dynamicParameters: [
+              {
+                name: "timezone",
+                location: "PARAMETER_LOCATION_BODY",
+                schema: {
+                  type: "string",
+                  description: "The lead's timezone, e.g. 'America/New_York'. Default to Eastern if unknown.",
+                },
+                required: false,
+              },
+            ],
+            staticParameters: [
+              { name: "calendarId", location: "PARAMETER_LOCATION_BODY", value: channelCalendarId },
+            ],
+            http: {
+              baseUrlPattern: `${APP_URL}/api/tools/calendar-availability`,
+              httpMethod: "POST",
+            },
           },
-        },
-      });
+        });
 
-      selectedTools.push({
-        temporaryTool: {
-          modelToolName: "sendTextScenarioA",
-          description:
-            "Send a callback text to the lead when all advisors are busy. Only use this if transferCall failed.",
-          dynamicParameters: [],
-          staticParameters: [
-            { name: "phone", location: "PARAMETER_LOCATION_BODY", value: callerPhone },
-            { name: "leadName", location: "PARAMETER_LOCATION_BODY", value: leadName },
-            { name: "contactId", location: "PARAMETER_LOCATION_BODY", value: contactId },
-          ],
-          http: {
-            baseUrlPattern: `${APP_URL}/api/tools/scenario-a`,
-            httpMethod: "POST",
+        selectedTools.push({
+          temporaryTool: {
+            modelToolName: "bookAppointment",
+            description:
+              "Book the appointment after the lead has chosen a time slot. Pass the exact ISO time string from the availability results.",
+            dynamicParameters: [
+              {
+                name: "selectedSlot",
+                location: "PARAMETER_LOCATION_BODY",
+                schema: {
+                  type: "string",
+                  description: "The ISO datetime string of the slot the lead chose, from the rawSlots in the checkAvailability response.",
+                },
+                required: true,
+              },
+            ],
+            staticParameters: [
+              { name: "calendarId", location: "PARAMETER_LOCATION_BODY", value: channelCalendarId },
+              { name: "contactId", location: "PARAMETER_LOCATION_BODY", value: contactId },
+              { name: "leadName", location: "PARAMETER_LOCATION_BODY", value: leadName },
+            ],
+            http: {
+              baseUrlPattern: `${APP_URL}/api/tools/book-appointment`,
+              httpMethod: "POST",
+            },
           },
-        },
-      });
+        });
+      } else {
+        // ── TRANSFER TOOLS ──
+        selectedTools.push({
+          temporaryTool: {
+            modelToolName: "transferCall",
+            description:
+              "Transfer this call to a live consultant. Call this tool the moment the lead is qualified.",
+            defaultReaction: "AGENT_REACTION_SPEAKS",
+            dynamicParameters: [],
+            staticParameters: [
+              { name: "callControlId", location: "PARAMETER_LOCATION_BODY", value: callSid },
+              { name: "contactId", location: "PARAMETER_LOCATION_BODY", value: contactId },
+            ],
+            automaticParameters: [
+              { name: "ultravoxCallId", location: "PARAMETER_LOCATION_BODY", knownValue: "KNOWN_PARAM_CALL_ID" },
+            ],
+            http: {
+              baseUrlPattern: `${APP_URL}/api/tools/warm-transfer`,
+              httpMethod: "POST",
+            },
+          },
+        });
+
+        selectedTools.push({
+          temporaryTool: {
+            modelToolName: "sendTextScenarioA",
+            description:
+              "Send a callback text to the lead when all advisors are busy. Only use this if transferCall failed.",
+            dynamicParameters: [],
+            staticParameters: [
+              { name: "phone", location: "PARAMETER_LOCATION_BODY", value: callerPhone },
+              { name: "leadName", location: "PARAMETER_LOCATION_BODY", value: leadName },
+              { name: "contactId", location: "PARAMETER_LOCATION_BODY", value: contactId },
+            ],
+            http: {
+              baseUrlPattern: `${APP_URL}/api/tools/scenario-a`,
+              httpMethod: "POST",
+            },
+          },
+        });
+      }
     } else {
       selectedTools.push({
         temporaryTool: {

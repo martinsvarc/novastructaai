@@ -46,6 +46,8 @@ export async function GET() {
         transfer_retry_msg: ch.transfer_retry_msg || "",
         transfer_error_msg: ch.transfer_error_msg || "",
         business_hours: ch.business_hours || {},
+        close_mode: ch.close_mode || "transfer",
+        ghl_calendar_id: ch.ghl_calendar_id || "",
         total_calls: total,
         transferred: Number(s.transferred) || 0,
         callbacks: Number(s.callbacks) || 0,
@@ -125,6 +127,8 @@ export async function PATCH(req: NextRequest) {
     const newRetryMsg = 'transfer_retry_msg' in fields ? fields.transfer_retry_msg : (row.transfer_retry_msg || '');
     const newErrorMsg = 'transfer_error_msg' in fields ? fields.transfer_error_msg : (row.transfer_error_msg || '');
     const newBusinessHours = 'business_hours' in fields ? JSON.stringify(fields.business_hours) : JSON.stringify(row.business_hours || {});
+    const newCloseMode = 'close_mode' in fields ? fields.close_mode : (row.close_mode || 'transfer');
+    const newGhlCalendarId = 'ghl_calendar_id' in fields ? fields.ghl_calendar_id : (row.ghl_calendar_id || '');
 
     await sql`
       UPDATE channels SET
@@ -138,7 +142,9 @@ export async function PATCH(req: NextRequest) {
         transfer_connecting_msg = ${newConnectMsg},
         transfer_retry_msg = ${newRetryMsg},
         transfer_error_msg = ${newErrorMsg},
-        business_hours = ${newBusinessHours}::jsonb
+        business_hours = ${newBusinessHours}::jsonb,
+        close_mode = ${newCloseMode},
+        ghl_calendar_id = ${newGhlCalendarId}
       WHERE id = ${id}
     `;
 

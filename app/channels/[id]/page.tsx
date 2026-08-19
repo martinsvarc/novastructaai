@@ -13,6 +13,13 @@ interface Channel {
   opener_speaks_first: boolean;
   scenario_a_script: string;
   scenario_b_script: string;
+  close_mode: string;
+  ghl_calendar_id: string;
+}
+
+interface GhlCalendar {
+  id: string;
+  name: string;
 }
 
 function formatPhone(phone: string | undefined | null) {
@@ -51,6 +58,10 @@ export default function ChannelDetailPage() {
   const [systemPrompt, setSystemPrompt] = useState("");
   const [scenarioA, setScenarioA] = useState("");
   const [scenarioB, setScenarioB] = useState("");
+  const [closeMode, setCloseMode] = useState("transfer");
+  const [ghlCalendarId, setGhlCalendarId] = useState("");
+  const [ghlCalendars, setGhlCalendars] = useState<GhlCalendar[]>([]);
+  const [loadingCalendars, setLoadingCalendars] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -68,12 +79,22 @@ export default function ChannelDetailPage() {
           setSystemPrompt(ch.system_prompt || "");
           setScenarioA(ch.scenario_a_script || "");
           setScenarioB(ch.scenario_b_script || "");
+          setCloseMode(ch.close_mode || "transfer");
+          setGhlCalendarId(ch.ghl_calendar_id || "");
           // If any script field has content, it's custom
           setUseCustom(!!(ch.system_prompt || ch.opener || ch.scenario_a_script || ch.scenario_b_script));
         }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
+
+    // Fetch GHL calendars
+    setLoadingCalendars(true);
+    fetch("/api/crm/calendars")
+      .then((res) => res.json())
+      .then((data) => { if (Array.isArray(data)) setGhlCalendars(data); })
+      .catch(() => {})
+      .finally(() => setLoadingCalendars(false));
   }, [id]);
 
   const saveChanges = useCallback(async () => {
@@ -89,6 +110,8 @@ export default function ChannelDetailPage() {
           system_prompt: useCustom ? systemPrompt : "",
           scenario_a_script: useCustom ? scenarioA : "",
           scenario_b_script: useCustom ? scenarioB : "",
+          close_mode: closeMode,
+          ghl_calendar_id: ghlCalendarId,
         }),
       });
       if (res.ok) showToast("Saved — live on next call");
@@ -97,7 +120,7 @@ export default function ChannelDetailPage() {
     } finally {
       setSaving(false);
     }
-  }, [id, name, opener, systemPrompt, scenarioA, scenarioB, useCustom]);
+  }, [id, name, opener, systemPrompt, scenarioA, scenarioB, useCustom, closeMode, ghlCalendarId]);
 
   // Auto-save on changes (1s debounce)
   useEffect(() => {
@@ -194,6 +217,99 @@ export default function ChannelDetailPage() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Close mode toggle */}
+      <div className="card">
+        <div className="card-header">
+          <div className="card-title">Close Mode</div>
+        </div>
+        <p style={{ fontSize: "0.78rem", color: "var(--text-secondary)", fontWeight: 300, marginBottom: 16, lineHeight: 1.6 }}>
+          How the AI closes qualified leads on this number.
+        </p>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={() => setCloseMode("transfer")}
+            style={{
+              flex: 1,
+              padding: "12px 16px",
+              borderRadius: 8,
+              border: `1px solid ${closeMode === "transfer" ? "var(--whiskey)" : "var(--border)"}`,
+              background: closeMode === "transfer" ? "rgba(243, 136, 14, 0.08)" : "transparent",
+              color: closeMode === "transfer" ? "var(--whiskey)" : "var(--text-secondary)",
+              cursor: "pointer",
+              fontFamily: "var(--sans)",
+              fontSize: "0.85rem",
+              fontWeight: 500,
+              transition: "all 0.15s",
+            }}
+          >
+            Live Transfer
+            <div style={{ fontSize: "0.7rem", fontWeight: 300, marginTop: 4, opacity: 0.7 }}>
+              Transfer to a closer
+            </div>
+          </button>
+          <button
+            onClick={() => setCloseMode("booking")}
+            style={{
+              flex: 1,
+              padding: "12px 16px",
+              borderRadius: 8,
+              border: `1px solid ${closeMode === "booking" ? "var(--whiskey)" : "var(--border)"}`,
+              background: closeMode === "booking" ? "rgba(243, 136, 14, 0.08)" : "transparent",
+              color: closeMode === "booking" ? "var(--whiskey)" : "var(--text-secondary)",
+              cursor: "pointer",
+              fontFamily: "var(--sans)",
+              fontSize: "0.85rem",
+              fontWeight: 500,
+              transition: "all 0.15s",
+            }}
+          >
+            Book Appointment
+            <div style={{ fontSize: "0.7rem", fontWeight: 300, marginTop: 4, opacity: 0.7 }}>
+              Schedule via GHL calendar
+            </div>
+          </button>
+        </div>
+
+        {closeMode === "booking" && (
+          <div style={{ marginTop: 16 }}>
+            <label style={{ fontSize: "0.78rem", fontWeight: 500, display: "block", marginBottom: 8 }}>
+              Calendar
+            </label>
+            {ghlCalendars.length > 0 ? (
+              <select
+                className="cred-input"
+                value={ghlCalendarId}
+                onChange={(e) => setGhlCalendarId(e.target.value)}
+                style={{ width: "100%", fontSize: "0.85rem", padding: "8px 12px" }}
+              >
+                <option value="">Select a calendar...</option>
+                {ghlCalendars.map((cal) => (
+                  <option key={cal.id} value={cal.id}>{cal.name}</option>
+                ))}
+              </select>
+            ) : loadingCalendars ? (
+              <div style={{ fontSize: "0.78rem", color: "var(--text-muted)", padding: "8px 0" }}>
+                Loading calendars...
+              </div>
+            ) : (
+              <div style={{ fontSize: "0.78rem", color: "var(--text-muted)", padding: "8px 0" }}>
+                No calendars found. Connect GoHighLevel in Settings first.
+              </div>
+            )}
+            {ghlCalendarId && !ghlCalendars.length && !loadingCalendars && (
+              <input
+                type="text"
+                className="cred-input"
+                value={ghlCalendarId}
+                onChange={(e) => setGhlCalendarId(e.target.value)}
+                placeholder="Calendar ID"
+                style={{ width: "100%", fontSize: "0.85rem", marginTop: 8 }}
+              />
+            )}
+          </div>
+        )}
       </div>
 
       {/* Script mode toggle */}
