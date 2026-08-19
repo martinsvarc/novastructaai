@@ -7,6 +7,19 @@ interface UltravoxMessage {
   text?: string;
 }
 
+interface CallDetails {
+  homeowner?: string;
+  location?: string;
+  dwelling?: string;
+  bill?: string;
+  credit?: string;
+  roof?: string;
+  shade?: string;
+  decision_makers?: string;
+  address?: string;
+  appointment?: string;
+}
+
 async function fetchCallMessages(
   callId: string,
   apiKey: string
@@ -61,7 +74,6 @@ function extractNameFromTranscript(
   );
   if (nameMatch) return nameMatch[1];
 
-  // Strategy 2b: Name at the very start of the summary (e.g. "Morin qualified for...")
   const startMatch = shortSummary.match(/^([A-Z][a-z]{1,15}(?:\s+[A-Z][a-z]{1,15})?)\s+(?:qualified|called|asked|wanted|inquired|expressed|is\s+interested|was\s+interested|said|mentioned|confirmed|agreed|requested)/);
   if (startMatch) return startMatch[1];
 
@@ -129,8 +141,6 @@ function detectOutcome(
 
   const summary = shortSummary.toLowerCase();
 
-  // Check callback BEFORE transferred in summary — if both words appear,
-  // "callback" is the real outcome (transfer failed, fallback text sent)
   if (
     summary.includes("callback") ||
     summary.includes("text sent") ||
@@ -168,7 +178,6 @@ function detectOutcome(
     return { outcome: "after_hours", outcomeSub: "Morning callback" };
   }
 
-  // Check agent transcript for disqualification
   const agentText = messages
     .filter((m) => m.role === "agent" && m.text)
     .map((m) => m.text!.toLowerCase())
@@ -190,6 +199,76 @@ function detectOutcome(
   return { outcome: "dropped", outcomeSub: `${durationSeconds}s` };
 }
 
+function extractCallDetails(messages: UltravoxMessage[]): CallDetails {
+  const details: CallDetails = {};
+
+  for (let i = 0; i < messages.length - 1; i++) {
+    const msg = messages[i];
+    if (msg.role !== "agent" || !msg.text) continue;
+    const lower = msg.text.toLowerCase();
+
+    let reply = "";
+    for (let j = i + 1; j < messages.length; j++) {
+      if (messages[j].role === "user" && messages[j].text) {
+        reply = messages[j].text!.trim();
+        break;
+      }
+      if (messages[j].role === "agent") break;
+    }
+    if (!reply) continue;
+
+    if (!details.homeowner && (lower.includes("own the home") || lower.includes("own your home") || lower.includes("renting right now") || lower.includes("homeowner"))) {
+      details.homeowner = reply;
+    }
+    if (!details.location && (lower.includes("whereabouts") || lower.includes("located") || lower.includes("city and state") || lower.includes("where are you"))) {
+      details.location = reply;
+    }
+    if (!details.dwelling && (lower.includes("townhome") || lower.includes("condo") || lower.includes("single family") || lower.includes("type deal") || lower.includes("house or") || lower.includes("type of home"))) {
+      details.dwelling = reply;
+    }
+    if (!details.bill && (lower.includes("electric bill") || lower.includes("bill runs") || lower.includes("bill run"))) {
+      details.bill = reply;
+    }
+    if (!details.credit && lower.includes("credit") && (lower.includes("score") || lower.includes("looking like") || lower.includes("ballpark") || lower.includes("roughly"))) {
+      details.credit = reply;
+    }
+    if (!details.roof && lower.includes("roof") && (lower.includes("old") || lower.includes("shape") || lower.includes("age") || lower.includes("decent"))) {
+      details.roof = reply;
+    }
+    if (!details.shade && (lower.includes("shaded") || lower.includes("shade") || (lower.includes("sun") && lower.includes("roof")) || (lower.includes("tree") && lower.includes("roof")))) {
+      details.shade = reply;
+    }
+    if (!details.decision_makers && (lower.includes("spouse") || lower.includes("decision") || lower.includes("co-owner") || lower.includes("anyone else"))) {
+      details.decision_makers = reply;
+    }
+    if (!details.address && (lower.includes("address") || (lower.includes("property") && lower.includes("pull up")))) {
+      details.address = reply;
+    }
+  }
+
+  for (const msg of messages) {
+    if (msg.role === "tool_result" && msg.toolName === "bookAppointment" && msg.text) {
+      try {
+        const r = JSON.parse(msg.text);
+        if (r.appointmentTime) details.appointment = r.appointmentTime;
+        else if (r.time) details.appointment = r.time;
+      } catch { /* not json */ }
+    }
+  }
+
+  return details;
+}
+
+function buildOneliner(details: CallDetails, fallback: string): string {
+  const parts: string[] = [];
+  if (details.location) parts.push(details.location.replace(/^\s+/, ""));
+  if (details.dwelling) parts.push(details.dwelling.replace(/^\s+/, ""));
+  if (details.bill) parts.push(details.bill.replace(/^\s+/, ""));
+  if (details.credit) parts.push("Credit " + details.credit.replace(/^\s+/, ""));
+  if (parts.length >= 2) return parts.join(" · ").slice(0, 100);
+  return fallback.slice(0, 80);
+}
+
 export async function POST(req: NextRequest) {
   try {
     const sql = getDb();
@@ -200,22 +279,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No Ultravox API key" }, { status: 500 });
     }
 
-    // Get recent calls that have recordings (meaning we have a callId)
-    const calls = await sql`SELECT id, recording_url, short_summary, duration_seconds, lead_name FROM calls ORDER BY id DESC LIMIT 10`;
+    // Get ALL calls that have recordings (callId embedded in recording_url)
+    const calls = await sql`SELECT id, recording_url, short_summary, duration_seconds, lead_name, call_details FROM calls ORDER BY id DESC`;
 
     let updated = 0;
+    let skipped = 0;
 
     for (const call of calls) {
       const recUrl = call.recording_url || "";
       const callIdMatch = recUrl.match(/\/api\/recording\/(.+)/);
-      if (!callIdMatch) continue;
+      if (!callIdMatch) { skipped++; continue; }
 
       const callId = callIdMatch[1];
       const messages = await fetchCallMessages(callId, apiKey);
-      if (messages.length === 0) continue;
+      if (messages.length === 0) { skipped++; continue; }
 
       const shortSummary = call.short_summary || "";
-      console.log(`Reprocessing call ${call.id}: summary="${shortSummary}", messages=${messages.length}`);
       const { outcome, outcomeSub } = detectOutcome(messages, "", call.duration_seconds || 0, shortSummary);
 
       let leadName = call.lead_name;
@@ -223,18 +302,21 @@ export async function POST(req: NextRequest) {
         leadName = extractNameFromTranscript(messages, shortSummary) || "Unknown";
       }
 
-      const oneliner = shortSummary.slice(0, 80) || "";
+      // Extract structured call details
+      const callDetails = extractCallDetails(messages);
+      const callDetailsJson = Object.keys(callDetails).length > 0 ? JSON.stringify(callDetails) : null;
+      const oneliner = callDetailsJson ? buildOneliner(callDetails, shortSummary) : shortSummary.slice(0, 80) || "";
 
       await sql`
         UPDATE calls
-        SET outcome = ${outcome}, outcome_sub = ${outcomeSub}, lead_name = ${leadName}, oneliner = ${oneliner}
+        SET outcome = ${outcome}, outcome_sub = ${outcomeSub}, lead_name = ${leadName}, oneliner = ${oneliner}, call_details = ${callDetailsJson}::jsonb
         WHERE id = ${call.id}
       `;
       updated++;
-      console.log(`Reprocessed call ${call.id}: outcome=${outcome}, name=${leadName}`);
+      console.log(`Reprocessed call ${call.id}: outcome=${outcome}, name=${leadName}, details=${Object.keys(callDetails).length} fields`);
     }
 
-    return NextResponse.json({ ok: true, updated });
+    return NextResponse.json({ ok: true, updated, skipped });
   } catch (error) {
     console.error("Reprocess error:", error);
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
