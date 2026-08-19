@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
     let contactId = rawContactId;
     if (!contactId || contactId === "unknown") {
       if (phone) {
-        const upserted = await upsertGhlContact(phone, leadName);
+        const upserted = await upsertGhlContact(phone);
         if (upserted) {
           contactId = upserted.contactId;
         } else {

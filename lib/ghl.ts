@@ -153,14 +153,9 @@ export async function getGhlFreeSlots(calendarId: string, timezone: string = "Am
  * Upsert a contact in GHL — finds existing by phone or creates new.
  * Returns the contactId.
  */
-export async function upsertGhlContact(phone: string, name?: string): Promise<{ contactId: string } | null> {
+export async function upsertGhlContact(phone: string): Promise<{ contactId: string } | null> {
   const token = await getGhlToken();
   if (!token) return null;
-
-  // Split name into first/last
-  const parts = (name || "").trim().split(/\s+/);
-  const firstName = parts[0] || "";
-  const lastName = parts.slice(1).join(" ") || "";
 
   try {
     const res = await fetch(`${GHL_API}/contacts/upsert`, {
@@ -173,8 +168,6 @@ export async function upsertGhlContact(phone: string, name?: string): Promise<{ 
       body: JSON.stringify({
         locationId: token.locationId,
         phone,
-        ...(firstName && { firstName }),
-        ...(lastName && { lastName }),
       }),
     });
 
