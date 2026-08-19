@@ -76,7 +76,7 @@ async function extractCallDetails(messages: UltravoxMessage[]): Promise<CallDeta
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "google/gemini-2.0-flash-lite-001",
+        model: "anthropic/claude-sonnet-4",
         messages: [
           { role: "system", content: EXTRACT_PROMPT },
           { role: "user", content: transcript },
