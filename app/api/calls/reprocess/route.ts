@@ -76,7 +76,7 @@ async function extractCallDetails(messages: UltravoxMessage[]): Promise<CallDeta
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "google/gemini-flash-1.5-8b",
+        model: "google/gemini-2.0-flash-001",
         messages: [
           { role: "system", content: EXTRACT_PROMPT },
           { role: "user", content: transcript },
@@ -86,12 +86,14 @@ async function extractCallDetails(messages: UltravoxMessage[]): Promise<CallDeta
     });
 
     if (!res.ok) {
-      console.error("OpenRouter extraction error:", res.status);
+      const errBody = await res.text();
+      console.error("OpenRouter extraction error:", res.status, errBody);
       return {};
     }
 
     const data = await res.json();
     const content = data.choices?.[0]?.message?.content || "";
+    console.log("LLM extraction raw:", content.slice(0, 200));
     const jsonStr = content.replace(/^```json?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
     return JSON.parse(jsonStr) as CallDetails;
   } catch (err) {
@@ -274,6 +276,9 @@ function buildOneliner(details: CallDetails, fallback: string): string {
 
 export async function POST(req: NextRequest) {
   try {
+    const url = new URL(req.url);
+    const limitParam = url.searchParams.get("limit");
+
     const sql = getDb();
     const settingsRows = await sql`SELECT ultravox_api_key FROM settings WHERE id = 1`;
     const apiKey = process.env.ULTRAVOX_API_KEY || settingsRows[0]?.ultravox_api_key || "";
@@ -282,8 +287,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No Ultravox API key" }, { status: 500 });
     }
 
-    // Get ALL calls that have recordings
-    const calls = await sql`SELECT id, recording_url, short_summary, duration_seconds, lead_name, call_details FROM calls ORDER BY id DESC`;
+    // Get calls that have recordings (optionally limited)
+    const calls = limitParam
+      ? await sql`SELECT id, recording_url, short_summary, duration_seconds, lead_name, call_details FROM calls WHERE recording_url != '' ORDER BY id DESC LIMIT ${parseInt(limitParam)}`
+      : await sql`SELECT id, recording_url, short_summary, duration_seconds, lead_name, call_details FROM calls ORDER BY id DESC`;
 
     let updated = 0;
     let skipped = 0;
