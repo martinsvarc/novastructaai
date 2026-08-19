@@ -114,14 +114,25 @@ function Section({
           style={{
             fontSize: "0.7rem",
             color: "var(--text-muted)",
-            transition: "transform 0.2s",
+            transition: "transform 0.3s ease",
             transform: open ? "rotate(180deg)" : "rotate(0deg)",
           }}
         >
           ▼
         </span>
       </button>
-      {open && <div style={{ paddingTop: "16px" }}>{children}</div>}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateRows: open ? "1fr" : "0fr",
+          opacity: open ? 1 : 0,
+          transition: "grid-template-rows 0.35s ease, opacity 0.25s ease",
+        }}
+      >
+        <div style={{ overflow: "hidden" }}>
+          <div style={{ paddingTop: "16px" }}>{children}</div>
+        </div>
+      </div>
     </div>
   );
 }
