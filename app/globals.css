@@ -749,6 +749,19 @@ body::after {
   border-radius: var(--radius-sm) var(--radius-sm) 0 0;
 }
 
+/* Booked calls — special treatment */
+.call-row.booked-row {
+  border-color: rgba(52,211,153,0.2);
+  background: rgba(52,211,153,0.04);
+}
+.call-row.booked-row:hover {
+  border-color: rgba(52,211,153,0.35);
+  background: rgba(52,211,153,0.07);
+}
+.call-row.booked-row .outcome-sub {
+  color: rgba(52,211,153,0.6);
+}
+
 /* Outcome accent — colored left dot */
 .call-accent {
   width: 8px;
@@ -758,7 +771,7 @@ body::after {
 }
 
 .call-accent.transferred { background: #F3880E; box-shadow: 0 0 6px rgba(243,136,14,0.3); }
-.call-accent.booked { background: #7FB0FF; box-shadow: 0 0 6px rgba(127,176,255,0.3); }
+.call-accent.booked { background: #34D399; box-shadow: 0 0 8px rgba(52,211,153,0.4); }
 .call-accent.callback { background: #3C68AC; box-shadow: 0 0 6px rgba(60,104,172,0.3); }
 .call-accent.after_hours { background: #9FB0CC; box-shadow: 0 0 6px rgba(159,176,204,0.2); }
 .call-accent.disqualified { background: var(--dim); }
@@ -779,7 +792,7 @@ body::after {
 }
 
 .outcome-word.transferred { color: #F3880E; }
-.outcome-word.booked { color: #7FB0FF; }
+.outcome-word.booked { color: #34D399; }
 .outcome-word.callback { color: #3C68AC; }
 .outcome-word.after_hours { color: #9FB0CC; }
 .outcome-word.disqualified { color: var(--dim); }
@@ -1345,7 +1358,7 @@ body::after {
 
 .channels-header {
   display: grid;
-  grid-template-columns: 170px 150px 70px 100px 100px 120px 50px;
+  grid-template-columns: 160px 150px minmax(200px, 1fr) 60px 120px 60px 40px;
   padding: 14px 24px;
   background: var(--headrow);
   border-bottom: 1px solid var(--line);
@@ -1359,7 +1372,7 @@ body::after {
 
 .channels-row {
   display: grid;
-  grid-template-columns: 170px 150px 70px 100px 100px 120px 50px;
+  grid-template-columns: 160px 150px minmax(200px, 1fr) 60px 120px 60px 40px;
   padding: 16px 24px;
   border-bottom: 1px solid var(--line);
   align-items: center;

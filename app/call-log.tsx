@@ -578,7 +578,7 @@ export function CallLog({ calls: initialCalls, channels }: { calls: Call[]; chan
             return (
               <div key={c.id}>
                 <div
-                  className={`call-row ${isExp ? "expanded" : ""}`}
+                  className={`call-row ${isExp ? "expanded" : ""} ${c.outcome === "booked" ? "booked-row" : ""}`}
                   onClick={() => setExpandedId(isExp ? null : c.id)}
                 >
                   <div className={`call-accent ${c.outcome}`}></div>
