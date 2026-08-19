@@ -58,7 +58,7 @@ export async function GET() {
             Authorization: `Bearer ${orKey}`,
           },
           body: JSON.stringify({
-            model: "google/gemini-2.0-flash-001",
+            model: "google/gemini-2.0-flash-lite-001",
             messages: [
               {
                 role: "system",
