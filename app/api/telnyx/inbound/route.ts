@@ -270,13 +270,9 @@ export async function POST(req: NextRequest) {
         const directive = `THIS IS DURING BUSINESS HOURS — APPOINTMENT BOOKING MODE.
 
 THE CLOSE — BOOK AN APPOINTMENT
-Once all four gates are confirmed, say naturally: "${bookingIntroMsg}"
+Once all four gates are confirmed, say naturally: "${bookingIntroMsg}" Then call checkAvailability IMMEDIATELY — do NOT ask what day or time they prefer first. The system already knows what times are available and will give you the 2 soonest options.
 
-Then IMMEDIATELY ask: "Would today or tomorrow work better for you?" Wait for their answer.
-Then ask: "Morning or afternoon?" Wait for their answer.
-Then call the checkAvailability tool to get the 2 best matching slots.
-
-When you get the times back, present both options naturally — e.g. "I have Tuesday at 10 AM or Tuesday at 2 PM — which one works?" Let them pick. Once they choose, call the bookAppointment tool with their selected time slot.
+Present both options naturally. For example: "I have today at 6 PM or tomorrow at 10 AM — which one works better for you?" Let them pick. Once they choose, call the bookAppointment tool with their selected time slot.
 
 After booking confirms, say naturally: "${bookingConfirmMsg}" Do NOT ask for their address.
 
@@ -287,7 +283,7 @@ ENDING CALLS: Never hang up abruptly. After booking completes, always ask "Is th
 ——————————————————————————\n\n`;
 
         systemPrompt = directive + systemPrompt + `\n\n——————————————————————————
-REMINDER: Ask today/tomorrow, then morning/afternoon, then call checkAvailability. Present the 2 options. Use bookAppointment with the lead's chosen slot. Never hang up without saying goodbye.`;
+REMINDER: Call checkAvailability right after qualifying — do NOT ask about day/time preferences first. Present the 2 options the tool gives you. Use bookAppointment with the lead's chosen slot. Never hang up without saying goodbye.`;
       } else {
         // ── TRANSFER MODE ──
         const closerNames = closers
