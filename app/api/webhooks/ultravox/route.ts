@@ -9,6 +9,107 @@ interface UltravoxMessage {
   text?: string;
 }
 
+interface CallDetails {
+  homeowner?: string;
+  location?: string;
+  dwelling?: string;
+  bill?: string;
+  credit?: string;
+  roof?: string;
+  shade?: string;
+  decision_makers?: string;
+  address?: string;
+  appointment?: string;
+}
+
+/**
+ * Scan agent/user message pairs and extract structured qualification data.
+ */
+function extractCallDetails(messages: UltravoxMessage[]): CallDetails {
+  const details: CallDetails = {};
+
+  for (let i = 0; i < messages.length - 1; i++) {
+    const msg = messages[i];
+    if (msg.role !== "agent" || !msg.text) continue;
+    const lower = msg.text.toLowerCase();
+
+    // Find next user reply
+    let reply = "";
+    for (let j = i + 1; j < messages.length; j++) {
+      if (messages[j].role === "user" && messages[j].text) {
+        reply = messages[j].text!.trim();
+        break;
+      }
+      if (messages[j].role === "agent") break;
+    }
+    if (!reply) continue;
+
+    // Gate 1: Homeowner
+    if (!details.homeowner && (lower.includes("own the home") || lower.includes("own your home") || lower.includes("renting right now") || lower.includes("homeowner"))) {
+      details.homeowner = reply;
+    }
+    // Gate 2: Location
+    if (!details.location && (lower.includes("whereabouts") || lower.includes("located") || lower.includes("city and state") || lower.includes("where are you"))) {
+      details.location = reply;
+    }
+    // Gate 3: Dwelling
+    if (!details.dwelling && (lower.includes("townhome") || lower.includes("condo") || lower.includes("single family") || lower.includes("type deal") || lower.includes("house or") || lower.includes("type of home"))) {
+      details.dwelling = reply;
+    }
+    // Gate 4: Electric bill
+    if (!details.bill && (lower.includes("electric bill") || lower.includes("bill runs") || lower.includes("bill run"))) {
+      details.bill = reply;
+    }
+    // Gate 5: Credit
+    if (!details.credit && lower.includes("credit") && (lower.includes("score") || lower.includes("looking like") || lower.includes("ballpark") || lower.includes("roughly"))) {
+      details.credit = reply;
+    }
+    // Roof
+    if (!details.roof && lower.includes("roof") && (lower.includes("old") || lower.includes("shape") || lower.includes("age") || lower.includes("decent"))) {
+      details.roof = reply;
+    }
+    // Shade
+    if (!details.shade && (lower.includes("shaded") || lower.includes("shade") || (lower.includes("sun") && lower.includes("roof")) || (lower.includes("tree") && lower.includes("roof")))) {
+      details.shade = reply;
+    }
+    // Decision makers
+    if (!details.decision_makers && (lower.includes("spouse") || lower.includes("decision") || lower.includes("co-owner") || lower.includes("anyone else"))) {
+      details.decision_makers = reply;
+    }
+    // Address
+    if (!details.address && (lower.includes("address") || (lower.includes("property") && lower.includes("pull up")))) {
+      details.address = reply;
+    }
+  }
+
+  // Check for booked appointment
+  for (const msg of messages) {
+    if (msg.role === "tool_result" && msg.toolName === "bookAppointment" && msg.text) {
+      try {
+        const r = JSON.parse(msg.text);
+        if (r.appointmentTime) details.appointment = r.appointmentTime;
+        else if (r.time) details.appointment = r.time;
+      } catch { /* not json */ }
+    }
+  }
+
+  return details;
+}
+
+/**
+ * Build a concise oneliner from extracted call details.
+ * e.g. "Tampa, FL · Duplex · $700/mo · Credit 650-700"
+ */
+function buildOneliner(details: CallDetails, fallback: string): string {
+  const parts: string[] = [];
+  if (details.location) parts.push(details.location.replace(/^\s+/, ""));
+  if (details.dwelling) parts.push(details.dwelling.replace(/^\s+/, ""));
+  if (details.bill) parts.push(details.bill.replace(/^\s+/, ""));
+  if (details.credit) parts.push("Credit " + details.credit.replace(/^\s+/, ""));
+  if (parts.length >= 2) return parts.join(" · ").slice(0, 100);
+  return fallback.slice(0, 80);
+}
+
 async function fetchCallMessages(
   callId: string,
   apiKey: string
@@ -291,7 +392,11 @@ export async function POST(req: NextRequest) {
       shortSummary
     );
 
-    const oneliner = metadata.oneliner || shortSummary.slice(0, 80) || "";
+    // Extract structured qualification details from transcript
+    const callDetails = messages.length > 0 ? extractCallDetails(messages) : null;
+    const callDetailsJson = callDetails && Object.keys(callDetails).length > 0 ? JSON.stringify(callDetails) : null;
+
+    const oneliner = metadata.oneliner || (callDetails ? buildOneliner(callDetails, shortSummary) : shortSummary.slice(0, 80)) || "";
     const ghlContactUrl =
       contactId && contactId !== "unknown"
         ? `https://app.gohighlevel.com/v2/location/${GHL_LOCATION_ID}/contacts/detail/${contactId}`
@@ -300,8 +405,8 @@ export async function POST(req: NextRequest) {
     const GHL_LOCATION = GHL_LOCATION_ID || "lmQk2oDHgL1OBDQdLRYC";
 
     const insertedRows = await sql`
-      INSERT INTO calls (lead_name, phone, outcome, outcome_sub, oneliner, ghl_contact_url, duration_seconds, recording_url, short_summary, channel_phone, created_at)
-      VALUES (${leadName}, ${leadPhone}, ${outcome}, ${outcomeSub}, ${oneliner}, ${ghlContactUrl}, ${durationSeconds}, ${recordingUrl}, ${shortSummary}, ${channelPhone}, NOW())
+      INSERT INTO calls (lead_name, phone, outcome, outcome_sub, oneliner, ghl_contact_url, duration_seconds, recording_url, short_summary, channel_phone, call_details, created_at)
+      VALUES (${leadName}, ${leadPhone}, ${outcome}, ${outcomeSub}, ${oneliner}, ${ghlContactUrl}, ${durationSeconds}, ${recordingUrl}, ${shortSummary}, ${channelPhone}, ${callDetailsJson}::jsonb, NOW())
       RETURNING id
     `;
     const callRowId = insertedRows[0]?.id;

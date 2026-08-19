@@ -3,6 +3,19 @@
 import { useState, useMemo, useRef, useCallback } from "react";
 import { useI18n } from "@/lib/i18n";
 
+interface CallDetails {
+  homeowner?: string;
+  location?: string;
+  dwelling?: string;
+  bill?: string;
+  credit?: string;
+  roof?: string;
+  shade?: string;
+  decision_makers?: string;
+  address?: string;
+  appointment?: string;
+}
+
 interface Call {
   id: number;
   lead_name: string;
@@ -16,6 +29,7 @@ interface Call {
   short_summary: string;
   created_at: string;
   channel_phone?: string;
+  call_details?: CallDetails | null;
 }
 
 function fmtDur(s: number) {
@@ -709,42 +723,81 @@ export function CallLog({ calls: initialCalls, channels }: { calls: Call[]; chan
                         </div>
                       ) : (
                         /* ===== VIEW MODE ===== */
-                        <div className="detail-cols">
-                          <div>
-                            <div className="detail-label">{t.callSummary}</div>
-                            <div className="summary-text">
-                              {c.short_summary || t.noSummary}
+                        <div className="detail-view">
+                          {/* Qualification grid */}
+                          {c.call_details && Object.keys(c.call_details).length > 0 ? (
+                            <>
+                              <div className="detail-label">Qualification</div>
+                              <div className="qual-grid">
+                                {([
+                                  { key: "homeowner", label: "Homeowner", icon: "M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z" },
+                                  { key: "location", label: "Location", icon: "M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 010-5 2.5 2.5 0 010 5z" },
+                                  { key: "dwelling", label: "Property", icon: "M3 21h18M3 7v1a3 3 0 006 0V7m0 0v1a3 3 0 006 0V7m0 0v1a3 3 0 006 0V7M3 7h18M6 21V10.7M18 21V10.7" },
+                                  { key: "bill", label: "Electric Bill", icon: "M13 2L3 14h9l-1 8 10-12h-9l1-8z" },
+                                  { key: "credit", label: "Credit Score", icon: "M2 10h20M2 14h20M6 18h2M12 18h6M4 6h16a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2z" },
+                                  { key: "roof", label: "Roof", icon: "M3 21l9-9 9 9M3 21V9l9-7 9 7v12" },
+                                  { key: "shade", label: "Sun/Shade", icon: "M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41M12 6a6 6 0 100 12 6 6 0 000-12z" },
+                                  { key: "decision_makers", label: "Decision Makers", icon: "M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" },
+                                  { key: "address", label: "Address", icon: "M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0zM12 7v6M9 10h6" },
+                                  { key: "appointment", label: "Appointment", icon: "M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z" },
+                                ] as const).map(({ key, label, icon }) => {
+                                  const val = c.call_details?.[key as keyof CallDetails];
+                                  if (!val) return null;
+                                  return (
+                                    <div key={key} className="qual-item">
+                                      <svg className="qual-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d={icon} />
+                                      </svg>
+                                      <div>
+                                        <div className="qual-label">{label}</div>
+                                        <div className="qual-value">{val}</div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </>
+                          ) : null}
+
+                          {/* Summary + Recording side by side */}
+                          <div className="detail-bottom-cols">
+                            <div>
+                              <div className="detail-label">{t.callSummary}</div>
+                              <div className="summary-text">
+                                {c.short_summary || t.noSummary}
+                              </div>
+                            </div>
+                            <div>
+                              <div className="detail-label">{t.recording}</div>
+                              {c.recording_url ? (
+                                <RecPlayer
+                                  url={c.recording_url}
+                                  duration={c.duration_seconds}
+                                />
+                              ) : (
+                                <div className="no-rec">{t.noRecording}</div>
+                              )}
                             </div>
                           </div>
-                          <div>
-                            <div className="detail-label">{t.recording}</div>
-                            {c.recording_url ? (
-                              <RecPlayer
-                                url={c.recording_url}
-                                duration={c.duration_seconds}
-                              />
-                            ) : (
-                              <div className="no-rec">{t.noRecording}</div>
-                            )}
-                            <div className="detail-actions">
-                              {c.ghl_contact_url && (
-                                <a
-                                  href={c.ghl_contact_url}
-                                  className="btn btn-ghost"
-                                  onClick={(e) => e.stopPropagation()}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                >
-                                  {t.openInGhl} ↗
-                                </a>
-                              )}
-                              <button
+
+                          <div className="detail-actions">
+                            {c.ghl_contact_url && (
+                              <a
+                                href={c.ghl_contact_url}
                                 className="btn btn-ghost"
-                                onClick={(e) => { e.stopPropagation(); startEditing(c); }}
+                                onClick={(e) => e.stopPropagation()}
+                                target="_blank"
+                                rel="noopener noreferrer"
                               >
-                                Edit
-                              </button>
-                            </div>
+                                {t.openInGhl} ↗
+                              </a>
+                            )}
+                            <button
+                              className="btn btn-ghost"
+                              onClick={(e) => { e.stopPropagation(); startEditing(c); }}
+                            >
+                              Edit
+                            </button>
                           </div>
                         </div>
                       )}

@@ -16,6 +16,7 @@ interface CallRow {
   short_summary: string;
   created_at: string;
   channel_phone?: string;
+  call_details?: Record<string, string> | null;
 }
 
 interface ChannelInfo {

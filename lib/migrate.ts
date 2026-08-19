@@ -28,6 +28,9 @@ export async function runMigrations() {
     await sql`ALTER TABLE settings ADD COLUMN IF NOT EXISTS booking_fail_msg TEXT DEFAULT 'Let me have someone confirm your time manually — we''ll reach out shortly to lock it in.'`;
     await sql`ALTER TABLE settings ADD COLUMN IF NOT EXISTS booking_min_hours_ahead INTEGER DEFAULT 3`;
 
+    // Structured call details
+    await sql`ALTER TABLE calls ADD COLUMN IF NOT EXISTS call_details JSONB`;
+
     console.log("DB migrations complete");
   } catch (err) {
     console.error("Migration error:", err);

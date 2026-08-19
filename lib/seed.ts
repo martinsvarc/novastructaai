@@ -132,6 +132,9 @@ async function seed() {
   await sql`ALTER TABLE settings ADD COLUMN IF NOT EXISTS booking_fail_msg TEXT DEFAULT $$Let me have someone confirm your time manually — we'll reach out shortly to lock it in.$$`;
   await sql`ALTER TABLE settings ADD COLUMN IF NOT EXISTS booking_min_hours_ahead INTEGER DEFAULT 3`;
 
+  // Structured call details
+  await sql`ALTER TABLE calls ADD COLUMN IF NOT EXISTS call_details JSONB`;
+
   // Seed calls
   // Base: July 8, 2026 at 3:00 PM ET (19:00 UTC)
   const now = new Date("2026-07-08T19:00:00Z");
@@ -149,6 +152,7 @@ async function seed() {
       recording_url: "",
       short_summary:
         "Maria called from Tampa. Homeowner, $280/mo bill, credit 720, roof replaced 2021. Asked whether lease or purchase makes more sense for her budget. Fully qualified — transferred to Carlos M. on first attempt, accepted immediately.",
+      call_details: { homeowner: "Yes, I own it", location: "Tampa, Florida", dwelling: "Single family home", bill: "About $280 a month", credit: "Around 720", roof: "Replaced in 2021, great shape", shade: "Full sun, no trees", decision_makers: "Just me", address: "4521 Bay Vista Dr, Tampa" },
       created_at: new Date(now.getTime() - 18 * 60 * 1000).toISOString(),
     },
     {
@@ -162,6 +166,7 @@ async function seed() {
       recording_url: "",
       short_summary:
         "Robert from Orlando — highest bill today. Credit 780, roof 2019, fully owns the home. Very engaged, asked about battery storage. Transferred to David L. who picked up right away.",
+      call_details: { homeowner: "Yes", location: "Orlando, Florida", dwelling: "House", bill: "$340 a month", credit: "780", roof: "2019, good condition", shade: "Mostly open, one tree on the side", decision_makers: "My wife would need to be there too", address: "1182 Magnolia Glen Ct, Orlando" },
       created_at: new Date(now.getTime() - 1.5 * 60 * 60 * 1000).toISOString(),
     },
     {
@@ -397,9 +402,10 @@ async function seed() {
   await sql`DELETE FROM calls`;
 
   for (const c of calls) {
+    const cd = "call_details" in c ? JSON.stringify(c.call_details) : null;
     await sql`
-      INSERT INTO calls (lead_name, phone, outcome, outcome_sub, oneliner, ghl_contact_url, duration_seconds, recording_url, short_summary, created_at)
-      VALUES (${c.lead_name}, ${c.phone}, ${c.outcome}, ${c.outcome_sub}, ${c.oneliner}, ${c.ghl_contact_url}, ${c.duration_seconds}, ${c.recording_url}, ${c.short_summary}, ${c.created_at})
+      INSERT INTO calls (lead_name, phone, outcome, outcome_sub, oneliner, ghl_contact_url, duration_seconds, recording_url, short_summary, call_details, created_at)
+      VALUES (${c.lead_name}, ${c.phone}, ${c.outcome}, ${c.outcome_sub}, ${c.oneliner}, ${c.ghl_contact_url}, ${c.duration_seconds}, ${c.recording_url}, ${c.short_summary}, ${cd}::jsonb, ${c.created_at})
     `;
   }
 
