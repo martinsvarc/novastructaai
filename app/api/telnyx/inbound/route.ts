@@ -420,6 +420,7 @@ ENDING CALLS: Never hang up abruptly. Always ask "Is there anything else before 
               { name: "calendarId", location: "PARAMETER_LOCATION_BODY", value: channelCalendarId },
               { name: "contactId", location: "PARAMETER_LOCATION_BODY", value: contactId },
               { name: "leadName", location: "PARAMETER_LOCATION_BODY", value: leadName },
+              { name: "phone", location: "PARAMETER_LOCATION_BODY", value: callerPhone },
             ],
             http: {
               baseUrlPattern: `${APP_URL}/api/tools/book-appointment`,

@@ -2,6 +2,37 @@ import { NextRequest, NextResponse } from "next/server";
 import { getGhlFreeSlots } from "@/lib/ghl";
 import { getDb } from "@/lib/db";
 
+/**
+ * Format a slot for voice — "today at 6 PM", "tomorrow at 10 AM", "Thursday at 2 PM"
+ */
+function formatSlotForVoice(isoSlot: string, tz: string): string {
+  const slotDate = new Date(isoSlot);
+  const now = new Date();
+
+  // Get just the date parts in the target timezone
+  const slotDay = slotDate.toLocaleDateString("en-US", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" });
+  const todayDay = now.toLocaleDateString("en-US", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" });
+
+  // Calculate tomorrow
+  const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  const tomorrowDay = tomorrow.toLocaleDateString("en-US", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" });
+
+  const time = slotDate.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: tz,
+  });
+
+  if (slotDay === todayDay) {
+    return `today at ${time}`;
+  } else if (slotDay === tomorrowDay) {
+    return `tomorrow at ${time}`;
+  } else {
+    const weekday = slotDate.toLocaleDateString("en-US", { weekday: "long", timeZone: tz });
+    return `${weekday} at ${time}`;
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -36,7 +67,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Sort chronologically — earliest first, always
+    // Sort chronologically — earliest first
     validSlots.sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
 
     if (validSlots.length === 0) {
@@ -48,20 +79,8 @@ export async function POST(req: NextRequest) {
     // Take the first 2 soonest slots
     const selected = validSlots.slice(0, 2);
 
-    // Format as readable strings
-    const formatted = selected.map((slot) => {
-      const d = new Date(slot);
-      return d.toLocaleDateString("en-US", {
-        weekday: "long",
-        month: "short",
-        day: "numeric",
-        timeZone: tz,
-      }) + " at " + d.toLocaleTimeString("en-US", {
-        hour: "numeric",
-        minute: "2-digit",
-        timeZone: tz,
-      });
-    });
+    // Format conversationally for voice
+    const formatted = selected.map((slot) => formatSlotForVoice(slot, tz));
 
     const slotList = formatted.length === 1
       ? formatted[0]

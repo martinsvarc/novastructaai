@@ -150,6 +150,55 @@ export async function getGhlFreeSlots(calendarId: string, timezone: string = "Am
 }
 
 /**
+ * Upsert a contact in GHL — finds existing by phone or creates new.
+ * Returns the contactId.
+ */
+export async function upsertGhlContact(phone: string, name?: string): Promise<{ contactId: string } | null> {
+  const token = await getGhlToken();
+  if (!token) return null;
+
+  // Split name into first/last
+  const parts = (name || "").trim().split(/\s+/);
+  const firstName = parts[0] || "";
+  const lastName = parts.slice(1).join(" ") || "";
+
+  try {
+    const res = await fetch(`${GHL_API}/contacts/upsert`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token.accessToken}`,
+        "Content-Type": "application/json",
+        Version: "2021-04-15",
+      },
+      body: JSON.stringify({
+        locationId: token.locationId,
+        phone,
+        ...(firstName && { firstName }),
+        ...(lastName && { lastName }),
+      }),
+    });
+
+    if (!res.ok) {
+      console.error("GHL upsert contact failed:", res.status, await res.text());
+      return null;
+    }
+
+    const data = await res.json();
+    const contactId = data.contact?.id;
+    if (!contactId) {
+      console.error("GHL upsert returned no contact ID:", JSON.stringify(data));
+      return null;
+    }
+
+    console.log("GHL contact upserted:", contactId, data.new ? "(new)" : "(existing)");
+    return { contactId };
+  } catch (err) {
+    console.error("GHL upsert contact error:", err);
+    return null;
+  }
+}
+
+/**
  * Book an appointment on a GHL calendar
  */
 export async function bookGhlAppointment(opts: {

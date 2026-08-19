@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { bookGhlAppointment } from "@/lib/ghl";
+import { bookGhlAppointment, upsertGhlContact } from "@/lib/ghl";
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { calendarId, contactId, selectedSlot, leadName } = body;
+    const { calendarId, contactId: rawContactId, selectedSlot, leadName, phone } = body;
 
     if (!calendarId || !selectedSlot) {
       return NextResponse.json({
@@ -13,11 +13,30 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // selectedSlot could be an ISO string or a human-readable string
-    // The AI should pass the raw ISO slot from the availability response
-    let startTime = selectedSlot;
+    // Resolve a real GHL contactId — upsert by phone (finds existing or creates new)
+    let contactId = rawContactId;
+    if (!contactId || contactId === "unknown") {
+      if (phone) {
+        const upserted = await upsertGhlContact(phone, leadName);
+        if (upserted) {
+          contactId = upserted.contactId;
+        } else {
+          console.error("Could not upsert GHL contact for", phone);
+          return NextResponse.json({
+            success: false,
+            message: "Could not create a contact record. Let the lead know we'll confirm their time manually and someone will reach out.",
+          });
+        }
+      } else {
+        return NextResponse.json({
+          success: false,
+          message: "No phone number available to look up contact. Let the lead know we'll confirm their time manually and someone will reach out.",
+        });
+      }
+    }
 
-    // If it's not already ISO, try to parse it
+    // Ensure startTime is ISO format
+    let startTime = selectedSlot;
     if (!selectedSlot.includes("T")) {
       const parsed = new Date(selectedSlot);
       if (!isNaN(parsed.getTime())) {
@@ -27,7 +46,7 @@ export async function POST(req: NextRequest) {
 
     const result = await bookGhlAppointment({
       calendarId,
-      contactId: contactId || "unknown",
+      contactId,
       startTime,
       title: leadName ? `Consultation — ${leadName}` : "AI-Booked Consultation",
     });
@@ -39,6 +58,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    console.error("GHL book appointment error detail:", result.error);
     return NextResponse.json({
       success: false,
       message: "Could not book the appointment right now. Let the lead know we'll confirm their time manually and someone will reach out. Then wrap up warmly.",
