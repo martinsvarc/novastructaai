@@ -8,6 +8,7 @@ interface UltravoxMessage {
 }
 
 interface CallDetails {
+  name?: string;
   homeowner?: string;
   location?: string;
   dwelling?: string;
@@ -40,6 +41,7 @@ async function fetchCallMessages(
 
 const EXTRACT_PROMPT = `Extract qualification details from this solar sales call transcript. Return ONLY a JSON object with these fields (omit any that weren't discussed):
 
+- name: The caller's full name (e.g. "Jim Simmons", "Maria Gonzalez"). Extract from when they introduce themselves or when asked for their name.
 - homeowner: Did they confirm they own the home? (e.g. "Yes, owns the home" or "Renter")
 - location: City and state (e.g. "Tampa, FL")
 - dwelling: Property type (e.g. "Single family home", "Duplex", "Townhome")
@@ -308,16 +310,21 @@ export async function POST(req: NextRequest) {
       const shortSummary = call.short_summary || "";
       const { outcome, outcomeSub } = detectOutcome(messages, "", call.duration_seconds || 0, shortSummary);
 
-      let leadName = call.lead_name;
-      if (!leadName || leadName === "Unknown") {
-        leadName = extractNameFromTranscript(messages, shortSummary) || "Unknown";
-      }
-
       // LLM-based extraction
       const callDetails = await extractCallDetails(messages);
       const fieldCount = Object.keys(callDetails).length;
       const callDetailsJson = fieldCount > 0 ? JSON.stringify(callDetails) : null;
       const oneliner = callDetailsJson ? buildOneliner(callDetails, shortSummary) : shortSummary.slice(0, 80) || "";
+
+      // Name: LLM extraction > existing > regex > "Unknown"
+      let leadName = call.lead_name;
+      if (!leadName || leadName === "Unknown") {
+        if (callDetails?.name) {
+          leadName = callDetails.name;
+        } else {
+          leadName = extractNameFromTranscript(messages, shortSummary) || "Unknown";
+        }
+      }
 
       await sql`
         UPDATE calls

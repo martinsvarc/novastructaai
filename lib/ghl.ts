@@ -151,11 +151,23 @@ export async function getGhlFreeSlots(calendarId: string, timezone: string = "Am
 
 /**
  * Upsert a contact in GHL — finds existing by phone or creates new.
+ * Passes name if provided so the contact isn't created as "Unknown".
  * Returns the contactId.
  */
-export async function upsertGhlContact(phone: string): Promise<{ contactId: string } | null> {
+export async function upsertGhlContact(phone: string, name?: string): Promise<{ contactId: string } | null> {
   const token = await getGhlToken();
   if (!token) return null;
+
+  // Split name into first/last for GHL
+  const payload: Record<string, string> = {
+    locationId: token.locationId,
+    phone,
+  };
+  if (name && name !== "Unknown") {
+    const parts = name.trim().split(/\s+/);
+    payload.firstName = parts[0];
+    if (parts.length > 1) payload.lastName = parts.slice(1).join(" ");
+  }
 
   try {
     const res = await fetch(`${GHL_API}/contacts/upsert`, {
@@ -165,10 +177,7 @@ export async function upsertGhlContact(phone: string): Promise<{ contactId: stri
         "Content-Type": "application/json",
         Version: "2021-04-15",
       },
-      body: JSON.stringify({
-        locationId: token.locationId,
-        phone,
-      }),
+      body: JSON.stringify(payload),
     });
 
     if (!res.ok) {

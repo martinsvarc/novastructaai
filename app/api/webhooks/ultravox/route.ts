@@ -10,6 +10,7 @@ interface UltravoxMessage {
 }
 
 interface CallDetails {
+  name?: string;
   homeowner?: string;
   location?: string;
   dwelling?: string;
@@ -25,6 +26,7 @@ interface CallDetails {
 
 const EXTRACT_PROMPT = `Extract qualification details from this solar sales call transcript. Return ONLY a JSON object with these fields (omit any that weren't discussed):
 
+- name: The caller's full name (e.g. "Jim Simmons", "Maria Gonzalez"). Extract from when they introduce themselves or when asked for their name.
 - homeowner: Did they confirm they own the home? (e.g. "Yes, owns the home" or "Renter")
 - location: City and state (e.g. "Tampa, FL")
 - dwelling: Property type (e.g. "Single family home", "Duplex", "Townhome")
@@ -375,11 +377,6 @@ export async function POST(req: NextRequest) {
     const endReason = call.endReason || "";
     const shortSummary = call.shortSummary || "";
 
-    // Extract lead name from transcript if not provided by pre-call lookup
-    if (!leadName) {
-      leadName = extractNameFromTranscript(messages, shortSummary) || "Unknown";
-      console.log("Extracted name from transcript:", leadName);
-    }
     const { outcome, outcomeSub } = detectOutcome(
       messages,
       endReason,
@@ -387,9 +384,20 @@ export async function POST(req: NextRequest) {
       shortSummary
     );
 
-    // Extract structured qualification details from transcript
+    // Extract structured qualification details from transcript (LLM-based)
     const callDetails = messages.length > 0 ? await extractCallDetails(messages) : null;
     const callDetailsJson = callDetails && Object.keys(callDetails).length > 0 ? JSON.stringify(callDetails) : null;
+
+    // Extract lead name: LLM extraction > regex > "Unknown"
+    if (!leadName) {
+      if (callDetails?.name) {
+        leadName = callDetails.name;
+        console.log("Name from LLM extraction:", leadName);
+      } else {
+        leadName = extractNameFromTranscript(messages, shortSummary) || "Unknown";
+        console.log("Name from regex extraction:", leadName);
+      }
+    }
 
     const oneliner = metadata.oneliner || (callDetails ? buildOneliner(callDetails, shortSummary) : shortSummary.slice(0, 80)) || "";
     const ghlContactUrl =

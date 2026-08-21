@@ -426,7 +426,7 @@ ENDING CALLS: Never hang up abruptly. Always ask "Is there anything else before 
           temporaryTool: {
             modelToolName: "bookAppointment",
             description:
-              "Book the appointment after the lead has chosen a time slot. Pass the exact ISO time string from the availability results.",
+              "Book the appointment after the lead has chosen a time slot. You MUST pass the lead's full name — you collected it during the call.",
             dynamicParameters: [
               {
                 name: "selectedSlot",
@@ -437,11 +437,19 @@ ENDING CALLS: Never hang up abruptly. Always ask "Is there anything else before 
                 },
                 required: true,
               },
+              {
+                name: "leadName",
+                location: "PARAMETER_LOCATION_BODY",
+                schema: {
+                  type: "string",
+                  description: "The lead's full name as they told you during the call. Always pass this.",
+                },
+                required: true,
+              },
             ],
             staticParameters: [
               { name: "calendarId", location: "PARAMETER_LOCATION_BODY", value: channelCalendarId },
               { name: "contactId", location: "PARAMETER_LOCATION_BODY", value: contactId },
-              { name: "leadName", location: "PARAMETER_LOCATION_BODY", value: leadName },
               { name: "phone", location: "PARAMETER_LOCATION_BODY", value: callerPhone },
             ],
             http: {
