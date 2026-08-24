@@ -1,7 +1,7 @@
 import { getDb } from "@/lib/db";
 import { SettingsClient } from "./settings-client";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 15;
 
 function maskCred(val: string): string {
   if (!val || val.length < 4) return val ? "****" : "";

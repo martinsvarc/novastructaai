@@ -1,7 +1,7 @@
 import { getDb } from "@/lib/db";
 import { CallLog } from "./call-log";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 15;
 
 export default async function CallLogPage() {
   const sql = getDb();
