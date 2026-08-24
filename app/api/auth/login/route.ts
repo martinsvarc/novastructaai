@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
       res.cookies.set("ns_session", "authenticated", {
         httpOnly: true,
         secure: true,
-        sameSite: "lax",
+        sameSite: "none",
         path: "/",
         maxAge: 60 * 60 * 24 * 30,
       });
