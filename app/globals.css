@@ -1465,7 +1465,7 @@ body::after {
 
 .channels-header {
   display: grid;
-  grid-template-columns: 160px 150px minmax(200px, 1fr) 60px 120px 60px 40px;
+  grid-template-columns: 150px 200px minmax(200px, 1fr) 60px 120px 60px 40px;
   padding: 14px 24px;
   background: var(--headrow);
   border-bottom: 1px solid var(--line);
@@ -1479,7 +1479,7 @@ body::after {
 
 .channels-row {
   display: grid;
-  grid-template-columns: 160px 150px minmax(200px, 1fr) 60px 120px 60px 40px;
+  grid-template-columns: 150px 200px minmax(200px, 1fr) 60px 120px 60px 40px;
   padding: 16px 24px;
   border-bottom: 1px solid var(--line);
   align-items: center;
@@ -1514,31 +1514,34 @@ body::after {
 .phone-copy-btn {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  padding: 5px 11px;
-  border-radius: 7px;
-  border: 1px solid var(--line);
-  background: var(--headrow);
+  gap: 6px;
+  padding: 0;
+  border-radius: 0;
+  border: none;
+  background: none;
   color: var(--mut);
-  font-size: 0.8rem;
-  font-weight: 400;
+  font-size: 0.82rem;
+  font-weight: 300;
   font-family: var(--body);
   letter-spacing: 0.02em;
   cursor: pointer;
-  transition: all 0.18s ease;
+  transition: color 0.18s ease;
   white-space: nowrap;
 }
 
 .phone-copy-btn svg {
-  width: 13px;
-  height: 13px;
+  width: 12px;
+  height: 12px;
   flex-shrink: 0;
-  opacity: 0.45;
+  opacity: 0;
   transition: opacity 0.18s ease, color 0.18s ease;
 }
 
+.channels-row:hover .phone-copy-btn svg {
+  opacity: 0.4;
+}
+
 .phone-copy-btn:hover {
-  border-color: var(--dim);
   color: var(--txt);
 }
 
@@ -1547,7 +1550,6 @@ body::after {
 }
 
 .phone-copy-btn.copied {
-  border-color: #6FC08A;
   color: #6FC08A;
 }
 
