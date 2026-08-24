@@ -1465,7 +1465,7 @@ body::after {
 
 .channels-header {
   display: grid;
-  grid-template-columns: 1.2fr 1.6fr 2fr 0.5fr 1fr 50px 36px;
+  grid-template-columns: 1.2fr 1.1fr 2fr 0.5fr 1fr 50px 36px;
   gap: 8px;
   padding: 14px 24px;
   background: var(--headrow);
@@ -1480,7 +1480,7 @@ body::after {
 
 .channels-row {
   display: grid;
-  grid-template-columns: 1.2fr 1.6fr 2fr 0.5fr 1fr 50px 36px;
+  grid-template-columns: 1.2fr 1.1fr 2fr 0.5fr 1fr 50px 36px;
   gap: 8px;
   padding: 16px 24px;
   border-bottom: 1px solid var(--line);
@@ -1516,9 +1516,9 @@ body::after {
 .phone-copy-btn {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
-  border-radius: 8px;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 6px;
   border: 1px solid var(--line);
   background: transparent;
   color: var(--mut);
