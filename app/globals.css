@@ -458,6 +458,87 @@ body::after {
 }
 
 /* ===== TOOLBAR: filters + date ===== */
+/* ── Filter bar ── */
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.filter-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  background: var(--headrow);
+  border-radius: 10px;
+  padding: 3px;
+}
+
+.filter-chip {
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  color: var(--dim);
+  transition: all 0.18s ease;
+  letter-spacing: 0.01em;
+  font-family: var(--body);
+  white-space: nowrap;
+  user-select: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+}
+
+.filter-chip:hover {
+  color: var(--txt);
+  background: rgba(255,255,255,0.04);
+}
+
+.filter-chip.active {
+  background: var(--panel);
+  color: var(--txt);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.25), 0 0 0 1px rgba(255,255,255,0.06);
+}
+
+[data-theme="light"] .filter-chip.active {
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.06);
+}
+
+.filter-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.filter-chip-cal {
+  gap: 5px;
+}
+
+.filter-chip-cal svg {
+  width: 13px;
+  height: 13px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.filter-chip-cal.open {
+  background: var(--panel);
+  color: var(--orange);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.25), 0 0 0 1px rgba(255,255,255,0.06);
+}
+
+/* Legacy toolbar (kept for other pages) */
 .toolbar {
   display: flex;
   align-items: center;
@@ -505,40 +586,6 @@ body::after {
   background: var(--headrow);
   border-color: var(--blue);
   color: var(--txt);
-}
-
-/* Calendar trigger button */
-.cal-trigger {
-  padding: 6px 14px;
-  border-radius: 99px;
-  font-size: 0.8rem;
-  font-weight: 500;
-  cursor: pointer;
-  border: 1px solid var(--line);
-  background: transparent;
-  color: var(--mut);
-  transition: all 0.15s;
-  letter-spacing: 0.02em;
-  font-family: var(--body);
-  white-space: nowrap;
-  user-select: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.cal-trigger:hover { border-color: var(--dim); color: var(--txt); }
-.cal-trigger.active { background: var(--headrow); border-color: var(--blue); color: var(--txt); }
-.cal-trigger.open { background: var(--headrow); border-color: var(--orange); color: var(--txt); }
-
-.cal-trigger svg {
-  width: 13px;
-  height: 13px;
-  stroke: currentColor;
-  fill: none;
-  stroke-width: 1.8;
-  stroke-linecap: round;
-  stroke-linejoin: round;
 }
 
 /* Calendar dropdown */

@@ -1,7 +1,7 @@
-"use client";
-
-import { useEffect, useState } from "react";
+import { getDb } from "@/lib/db";
 import { SettingsClient } from "./settings-client";
+
+export const dynamic = "force-dynamic";
 
 function maskCred(val: string): string {
   if (!val || val.length < 4) return val ? "****" : "";
@@ -45,50 +45,11 @@ const DEFAULTS = {
   },
 };
 
-export default function SettingsPage() {
-  const [settings, setSettings] = useState<typeof DEFAULTS | null>(null);
-  const [error, setError] = useState(false);
+export default async function SettingsPage() {
+  const sql = getDb();
+  const rows = await sql`SELECT * FROM settings WHERE id = 1`;
 
-  useEffect(() => {
-    fetch("/api/settings")
-      .then((res) => {
-        if (!res.ok) throw new Error("Failed");
-        return res.json();
-      })
-      .then((data) => {
-        setSettings({
-          system_prompt: data.system_prompt || "",
-          opener: data.opener || "hey there",
-          opener_speaks_first: data.opener_speaks_first !== false,
-          transfer_enabled: !!data.transfer_enabled,
-          closers: data.closers || [],
-          telnyx_phone: data.telnyx_phone || "",
-          ultravox_api_key: data.ultravox_api_key || "",
-          ultravox_agent_id: data.ultravox_agent_id || "",
-          ultravox_voice_id: data.ultravox_voice_id || "",
-          ghl_calendar_id: data.ghl_calendar_id || "",
-          scenario_a_script: data.scenario_a_script || "",
-          scenario_b_script: data.scenario_b_script || "",
-          transfer_connecting_msg: data.transfer_connecting_msg || DEFAULTS.transfer_connecting_msg,
-          transfer_retry_msg: data.transfer_retry_msg || DEFAULTS.transfer_retry_msg,
-          scenario_a_opener: data.scenario_a_opener || DEFAULTS.scenario_a_opener,
-          transfer_error_msg: data.transfer_error_msg || DEFAULTS.transfer_error_msg,
-          inactivity_1_seconds: data.inactivity_1_seconds ?? 8,
-          inactivity_1_message: data.inactivity_1_message || DEFAULTS.inactivity_1_message,
-          inactivity_2_seconds: data.inactivity_2_seconds ?? 10,
-          inactivity_2_message: data.inactivity_2_message || DEFAULTS.inactivity_2_message,
-          vad_sensitivity: data.vad_sensitivity ?? 0.15,
-          business_hours: data.business_hours || DEFAULTS.business_hours,
-          booking_intro_msg: data.booking_intro_msg || DEFAULTS.booking_intro_msg,
-          booking_confirm_msg: data.booking_confirm_msg || DEFAULTS.booking_confirm_msg,
-          booking_fail_msg: data.booking_fail_msg || DEFAULTS.booking_fail_msg,
-          booking_min_hours_ahead: data.booking_min_hours_ahead ?? DEFAULTS.booking_min_hours_ahead,
-        });
-      })
-      .catch(() => setError(true));
-  }, []);
-
-  if (error) {
+  if (rows.length === 0) {
     return (
       <div>
         <div className="page-header">
@@ -100,39 +61,35 @@ export default function SettingsPage() {
     );
   }
 
-  if (!settings) {
-    return (
-      <div className="skeleton-fade-in">
-        <div className="page-header">
-          <div className="page-tag">Configuration</div>
-          <h2>Settings</h2>
-        </div>
-        <div className="skeleton-card">
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <div className="skeleton" style={{ width: 140, height: 16 }} />
-              <div className="skeleton" style={{ width: 220, height: 10 }} />
-            </div>
-            <div className="skeleton" style={{ width: 48, height: 26, borderRadius: 13 }} />
-          </div>
-        </div>
-        <div className="skeleton-card" style={{ opacity: 0.85 }}>
-          <div className="skeleton" style={{ width: 120, height: 14, marginBottom: 16 }} />
-          {[1, 2].map((i) => (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-              <div className="skeleton" style={{ width: 24, height: 14 }} />
-              <div className="skeleton" style={{ width: 100, height: 14 }} />
-              <div className="skeleton" style={{ width: 130, height: 14 }} />
-            </div>
-          ))}
-        </div>
-        <div className="skeleton-card" style={{ opacity: 0.7 }}>
-          <div className="skeleton" style={{ width: 110, height: 14, marginBottom: 16 }} />
-          <div className="skeleton" style={{ width: "100%", height: 120, borderRadius: 8 }} />
-        </div>
-      </div>
-    );
-  }
+  const data = rows[0];
+  const settings = {
+    system_prompt: data.system_prompt || "",
+    opener: data.opener || "hey there",
+    opener_speaks_first: data.opener_speaks_first !== false,
+    transfer_enabled: !!data.transfer_enabled,
+    closers: data.closers || [],
+    telnyx_phone: data.telnyx_phone || "",
+    ultravox_api_key: maskCred(data.ultravox_api_key || ""),
+    ultravox_agent_id: data.ultravox_agent_id || "",
+    ultravox_voice_id: data.ultravox_voice_id || "",
+    ghl_calendar_id: data.ghl_calendar_id || "",
+    scenario_a_script: data.scenario_a_script || "",
+    scenario_b_script: data.scenario_b_script || "",
+    transfer_connecting_msg: data.transfer_connecting_msg || DEFAULTS.transfer_connecting_msg,
+    transfer_retry_msg: data.transfer_retry_msg || DEFAULTS.transfer_retry_msg,
+    scenario_a_opener: data.scenario_a_opener || DEFAULTS.scenario_a_opener,
+    transfer_error_msg: data.transfer_error_msg || DEFAULTS.transfer_error_msg,
+    inactivity_1_seconds: data.inactivity_1_seconds ?? 8,
+    inactivity_1_message: data.inactivity_1_message || DEFAULTS.inactivity_1_message,
+    inactivity_2_seconds: data.inactivity_2_seconds ?? 10,
+    inactivity_2_message: data.inactivity_2_message || DEFAULTS.inactivity_2_message,
+    vad_sensitivity: data.vad_sensitivity ?? 0.15,
+    business_hours: data.business_hours || DEFAULTS.business_hours,
+    booking_intro_msg: data.booking_intro_msg || DEFAULTS.booking_intro_msg,
+    booking_confirm_msg: data.booking_confirm_msg || DEFAULTS.booking_confirm_msg,
+    booking_fail_msg: data.booking_fail_msg || DEFAULTS.booking_fail_msg,
+    booking_min_hours_ahead: data.booking_min_hours_ahead ?? DEFAULTS.booking_min_hours_ahead,
+  };
 
   return <SettingsClient initialSettings={settings} />;
 }

@@ -421,12 +421,12 @@ export function CallLog({ calls: initialCalls, channels }: { calls: Call[]; chan
         <h2>{t.callLogTitle}</h2>
       </div>
 
-      {/* Channel filter */}
-      {channels && channels.length > 0 && (
-        <div className="toolbar" style={{ marginBottom: 0, paddingBottom: 0 }}>
-          <div className="toolbar-left">
+      {/* Unified filter bar */}
+      <div className="filter-bar">
+        {channels && channels.length > 0 && (
+          <div className="filter-group">
             <button
-              className={`pill ${currentChannel === "all" ? "active" : ""}`}
+              className={`filter-chip ${currentChannel === "all" ? "active" : ""}`}
               onClick={() => { setCurrentChannel("all"); setExpandedId(null); }}
             >
               All Channels
@@ -434,34 +434,21 @@ export function CallLog({ calls: initialCalls, channels }: { calls: Call[]; chan
             {channels.map((ch) => (
               <button
                 key={ch.id}
-                className={`pill ${currentChannel === ch.phone ? "active" : ""}`}
+                className={`filter-chip ${currentChannel === ch.phone ? "active" : ""}`}
                 onClick={() => { setCurrentChannel(ch.phone); setExpandedId(null); }}
               >
-                <span
-                  style={{
-                    display: "inline-block",
-                    width: 6,
-                    height: 6,
-                    borderRadius: "50%",
-                    backgroundColor: ch.color,
-                    marginRight: 6,
-                    flexShrink: 0,
-                  }}
-                />
+                <span className="filter-dot" style={{ backgroundColor: ch.color }} />
                 {ch.name}
               </button>
             ))}
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Date range toolbar */}
-      <div className="toolbar">
-        <div className="toolbar-left">
+        <div className="filter-group">
           {["today", "7d", "30d"].map((r) => (
             <button
               key={r}
-              className={`pill ${currentRange === r ? "active" : ""}`}
+              className={`filter-chip ${currentRange === r ? "active" : ""}`}
               onClick={() => handleRangeChange(r)}
             >
               {r === "today" ? t.today : r}
@@ -469,7 +456,7 @@ export function CallLog({ calls: initialCalls, channels }: { calls: Call[]; chan
           ))}
           <div style={{ position: "relative", display: "inline-flex" }}>
             <button
-              className={`cal-trigger ${currentRange === "custom" ? "active" : ""} ${calOpen ? "open" : ""}`}
+              className={`filter-chip filter-chip-cal ${currentRange === "custom" ? "active" : ""} ${calOpen ? "open" : ""}`}
               onClick={(e) => {
                 e.stopPropagation();
                 setCalOpen(!calOpen);
