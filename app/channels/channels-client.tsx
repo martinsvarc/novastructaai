@@ -241,6 +241,7 @@ export function ChannelsClient({ initialChannels }: { initialChannels: Channel[]
         <div className="channels-header">
           <div>Channel</div>
           <div>Number</div>
+          <div></div>
           <div>Close Mode</div>
           <div>Calls</div>
           <div>Connected %</div>
@@ -260,6 +261,7 @@ export function ChannelsClient({ initialChannels }: { initialChannels: Channel[]
               )}
             </div>
             <CopyPhoneButton phone={ch.phone} />
+            <div />
             <div className="channel-cell" style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 220 }}>
               <div style={{ display: "flex", background: "var(--headrow)", borderRadius: 6, overflow: "hidden", flexShrink: 0 }}>
                 <button
