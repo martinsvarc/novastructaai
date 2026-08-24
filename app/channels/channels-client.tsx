@@ -442,33 +442,117 @@ export function ChannelsClient({ initialChannels }: { initialChannels: Channel[]
         )}
       </div>
 
-      {/* Bar chart */}
-      {channels.length > 0 && (
-        <div className="channels-chart">
-          <div className="chart-label">Calls by Channel · 30 Days</div>
-          <div className="chart-bars">
-            {channels.map((ch) => {
-              const height = Math.max((ch.total_calls / maxCalls) * 120, 4);
-              const transferredH = ch.total_calls > 0 ? (ch.transferred / ch.total_calls) * height : 0;
-              const otherH = height - transferredH;
-              return (
-                <div key={ch.id} className="chart-bar-group">
-                  <div className="chart-bar-value">{ch.total_calls}</div>
-                  <div className="chart-bar-stack">
-                    {otherH > 0 && <div className="chart-bar-segment" style={{ height: `${otherH}px`, background: ch.color, opacity: 0.35 }} />}
-                    {transferredH > 0 && <div className="chart-bar-segment" style={{ height: `${transferredH}px`, background: ch.color }} />}
-                  </div>
-                  <div className="chart-bar-label">{ch.name}</div>
+      {/* Outcome breakdown */}
+      {channels.length > 0 && (() => {
+        const OUTCOMES = [
+          { key: "transferred" as const, label: "Transferred", color: "#F3880E" },
+          { key: "booked" as const, label: "Booked", color: "#6FC08A" },
+          { key: "callbacks" as const, label: "Callback", color: "#60A5FA" },
+          { key: "after_hours" as const, label: "After Hours", color: "#9B7DD4" },
+          { key: "disqualified" as const, label: "Disqualified", color: "#7487A8" },
+          { key: "dropped" as const, label: "Dropped", color: "#C47050" },
+        ];
+        const allTotal = channels.reduce((s, c) => s + c.total_calls, 0);
+        const allOutcomes = OUTCOMES.map(o => ({
+          ...o,
+          value: channels.reduce((s, c) => s + c[o.key], 0),
+        }));
+
+        // Donut ring segments
+        const donutSize = 140;
+        const stroke = 18;
+        const radius = (donutSize - stroke) / 2;
+        const circumference = 2 * Math.PI * radius;
+        let donutOffset = 0;
+
+        return (
+          <div className="channels-chart">
+            <div className="chart-label">Outcome Breakdown · 30 Days</div>
+            <div className="breakdown-layout">
+              {/* Donut chart */}
+              <div className="breakdown-donut-wrap">
+                <svg width={donutSize} height={donutSize} viewBox={`0 0 ${donutSize} ${donutSize}`}>
+                  {/* Background ring */}
+                  <circle cx={donutSize/2} cy={donutSize/2} r={radius} fill="none" stroke="var(--line)" strokeWidth={stroke} />
+                  {allTotal > 0 && allOutcomes.map((o) => {
+                    const pct = o.value / allTotal;
+                    const dashLen = pct * circumference;
+                    const gap = circumference - dashLen;
+                    const offset = donutOffset;
+                    donutOffset += dashLen;
+                    if (pct === 0) return null;
+                    return (
+                      <circle
+                        key={o.key}
+                        cx={donutSize/2} cy={donutSize/2} r={radius}
+                        fill="none"
+                        stroke={o.color}
+                        strokeWidth={stroke}
+                        strokeDasharray={`${dashLen} ${gap}`}
+                        strokeDashoffset={-offset}
+                        strokeLinecap="butt"
+                        style={{ transform: "rotate(-90deg)", transformOrigin: "center" }}
+                      />
+                    );
+                  })}
+                </svg>
+                <div className="breakdown-donut-center">
+                  <div className="breakdown-donut-number">{allTotal}</div>
+                  <div className="breakdown-donut-label">Total</div>
                 </div>
-              );
-            })}
+              </div>
+
+              {/* Per-channel horizontal bars */}
+              <div className="breakdown-channels">
+                {channels.map((ch) => (
+                  <div key={ch.id} className="breakdown-channel">
+                    <div className="breakdown-ch-header">
+                      <span className="breakdown-ch-dot" style={{ background: ch.color }} />
+                      <span className="breakdown-ch-name">{ch.name}</span>
+                      <span className="breakdown-ch-total">{ch.total_calls}</span>
+                    </div>
+                    <div className="breakdown-bar-track">
+                      {ch.total_calls > 0 && OUTCOMES.map((o) => {
+                        const pct = (ch[o.key] / ch.total_calls) * 100;
+                        if (pct === 0) return null;
+                        return (
+                          <div
+                            key={o.key}
+                            className="breakdown-bar-seg"
+                            style={{ width: `${pct}%`, background: o.color }}
+                            title={`${o.label}: ${ch[o.key]}`}
+                          />
+                        );
+                      })}
+                    </div>
+                    <div className="breakdown-ch-stats">
+                      {OUTCOMES.map((o) => {
+                        const val = ch[o.key];
+                        if (val === 0) return null;
+                        return (
+                          <span key={o.key} className="breakdown-ch-stat" style={{ color: o.color }}>
+                            {val} {o.label}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Legend */}
+            <div className="chart-legend">
+              {OUTCOMES.map(o => (
+                <div key={o.key} className="legend-item">
+                  <div className="legend-dot" style={{ background: o.color }} />
+                  {o.label}
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="chart-legend">
-            <div className="legend-item"><div className="legend-dot" style={{ background: "var(--orange)" }} /> Transferred</div>
-            <div className="legend-item"><div className="legend-dot" style={{ background: "var(--orange)", opacity: 0.35 }} /> Other calls</div>
-          </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

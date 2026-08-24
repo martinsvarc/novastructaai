@@ -1677,53 +1677,119 @@ body::after {
   margin-bottom: 24px;
 }
 
-.chart-bars {
+.breakdown-layout {
   display: flex;
-  align-items: flex-end;
-  gap: 16px;
-  min-height: 160px;
-  padding-bottom: 28px;
-  position: relative;
+  gap: 36px;
+  align-items: flex-start;
 }
 
-.chart-bar-group {
+.breakdown-donut-wrap {
+  position: relative;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.breakdown-donut-center {
+  position: absolute;
+  text-align: center;
+}
+
+.breakdown-donut-number {
+  font-family: var(--head);
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--txt);
+  line-height: 1;
+}
+
+.breakdown-donut-label {
+  font-size: 0.65rem;
+  color: var(--dim);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-top: 2px;
+}
+
+.breakdown-channels {
   flex: 1;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  justify-content: flex-end;
+  gap: 16px;
+  min-width: 0;
 }
 
-.chart-bar-value {
-  font-family: var(--head);
-  font-size: 0.9rem;
-  font-weight: 700;
-  color: var(--mut);
-}
-
-.chart-bar-stack {
-  width: 100%;
+.breakdown-channel {
   display: flex;
   flex-direction: column;
+  gap: 6px;
+}
+
+.breakdown-ch-header {
+  display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 8px;
 }
 
-.chart-bar-segment {
-  width: 36px;
-  border-radius: 3px;
+.breakdown-ch-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 
-.chart-bar-label {
-  font-size: 0.7rem;
+.breakdown-ch-name {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--txt);
+}
+
+.breakdown-ch-total {
+  font-size: 0.75rem;
   color: var(--dim);
-  text-align: center;
-  font-weight: 400;
-  white-space: nowrap;
+  margin-left: auto;
+  font-weight: 500;
+  font-family: var(--head);
+}
+
+.breakdown-bar-track {
+  display: flex;
+  height: 8px;
+  border-radius: 4px;
   overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 80px;
+  background: var(--line);
+  gap: 1px;
+}
+
+.breakdown-bar-seg {
+  height: 100%;
+  min-width: 3px;
+  transition: width 0.3s ease;
+}
+
+.breakdown-bar-seg:first-child {
+  border-radius: 4px 0 0 4px;
+}
+
+.breakdown-bar-seg:last-child {
+  border-radius: 0 4px 4px 0;
+}
+
+.breakdown-bar-seg:only-child {
+  border-radius: 4px;
+}
+
+.breakdown-ch-stats {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.breakdown-ch-stat {
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
 }
 
 .chart-legend {
