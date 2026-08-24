@@ -1511,6 +1511,51 @@ body::after {
   font-weight: 300;
 }
 
+.phone-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 11px;
+  border-radius: 7px;
+  border: 1px solid var(--line);
+  background: var(--headrow);
+  color: var(--mut);
+  font-size: 0.8rem;
+  font-weight: 400;
+  font-family: var(--body);
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  white-space: nowrap;
+}
+
+.phone-copy-btn svg {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+  opacity: 0.45;
+  transition: opacity 0.18s ease, color 0.18s ease;
+}
+
+.phone-copy-btn:hover {
+  border-color: var(--dim);
+  color: var(--txt);
+}
+
+.phone-copy-btn:hover svg {
+  opacity: 0.8;
+}
+
+.phone-copy-btn.copied {
+  border-color: #6FC08A;
+  color: #6FC08A;
+}
+
+.phone-copy-btn.copied svg {
+  opacity: 1;
+  color: #6FC08A;
+}
+
 .channel-cell {
   font-size: 0.88rem;
   font-weight: 400;

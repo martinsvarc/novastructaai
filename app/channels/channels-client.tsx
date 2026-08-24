@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 
 interface Channel {
@@ -41,6 +41,34 @@ function formatPhone(phone: string | undefined | null) {
     return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
   }
   return phone;
+}
+
+function CopyPhoneButton({ phone }: { phone: string }) {
+  const [copied, setCopied] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function copy() {
+    navigator.clipboard.writeText(phone);
+    setCopied(true);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => setCopied(false), 1500);
+  }
+
+  return (
+    <button className={`phone-copy-btn ${copied ? "copied" : ""}`} onClick={copy} title="Copy number">
+      <span>{formatPhone(phone)}</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        {copied ? (
+          <polyline points="20 6 9 17 4 12" />
+        ) : (
+          <>
+            <rect x="9" y="9" width="13" height="13" rx="2" />
+            <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+          </>
+        )}
+      </svg>
+    </button>
+  );
 }
 
 export function ChannelsClient({ initialChannels }: { initialChannels: Channel[] }) {
@@ -231,7 +259,7 @@ export function ChannelsClient({ initialChannels }: { initialChannels: Channel[]
                 </span>
               )}
             </div>
-            <div className="channel-phone">{formatPhone(ch.phone)}</div>
+            <CopyPhoneButton phone={ch.phone} />
             <div className="channel-cell" style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 220 }}>
               <div style={{ display: "flex", background: "var(--headrow)", borderRadius: 6, overflow: "hidden", flexShrink: 0 }}>
                 <button
