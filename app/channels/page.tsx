@@ -1,11 +1,9 @@
 import { getDb } from "@/lib/db";
-import { runMigrations } from "@/lib/migrate";
 import { ChannelsClient } from "./channels-client";
 
 export const dynamic = "force-dynamic";
 
 export default async function ChannelsPage() {
-  await runMigrations();
   const sql = getDb();
 
   const channels = await sql`SELECT * FROM channels ORDER BY created_at ASC`;
